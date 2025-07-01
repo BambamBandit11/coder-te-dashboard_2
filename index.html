@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coder T&E Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Travel & Entertainment Dashboard</h1>
+        <div class="header-controls">
+            <span id="last-updated">Last updated: Never</span>
+            <button id="refresh-btn" class="btn-primary">Refresh Data</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="filters">
+            <div class="filter-group">
+                <label for="department-filter">Department:</label>
+                <select id="department-filter">
+                    <option value="all">All Departments</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="employee-filter">Employee:</label>
+                <select id="employee-filter">
+                    <option value="all">All Employees</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="month-filter">Month:</label>
+                <select id="month-filter">
+                    <option value="all">All Months (YTD)</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="merchant-filter">Merchant:</label>
+                <select id="merchant-filter">
+                    <option value="all">All Merchants</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="summary-cards">
+            <div class="card">
+                <h3>Total YTD Spend</h3>
+                <div class="amount" id="total-spend">$0.00</div>
+            </div>
+            <div class="card">
+                <h3>This Month</h3>
+                <div class="amount" id="month-spend">$0.00</div>
+            </div>
+            <div class="card">
+                <h3>Transaction Count</h3>
+                <div class="count" id="transaction-count">0</div>
+            </div>
+        </div>
+
+        <div class="department-breakdown">
+            <h2>Department Breakdown</h2>
+            <div id="department-chart" class="chart-container">
+                <!-- Department spending chart will be inserted here -->
+            </div>
+        </div>
+
+        <div class="monthly-trend">
+            <h2>Monthly Trend</h2>
+            <div id="monthly-chart" class="chart-container">
+                <!-- Monthly trend chart will be inserted here -->
+            </div>
+        </div>
+
+        <div class="transactions-table">
+            <h2>Recent Transactions</h2>
+            <div class="table-container">
+                <table id="transactions">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Employee</th>
+                            <th>Department</th>
+                            <th>Merchant</th>
+                            <th>Amount</th>
+                            <th>Location</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Transactions will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <p>Loading data...</p>
+    </div>
+
+    <div id="error" class="error hidden">
+        <p>Error loading data. Please try again.</p>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

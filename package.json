@@ -1,0 +1,20 @@
+{
+  "name": "coder-te-dashboard",
+  "version": "1.0.0",
+  "description": "Travel & Entertainment Dashboard for Coder Finance",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static site - no build needed'",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

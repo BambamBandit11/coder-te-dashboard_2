@@ -29,15 +29,12 @@ export default async function handler(req, res) {
         // Step 1: Get access token
         const accessToken = await getAccessToken(baseUrl, clientId, clientSecret);
         
-        // Step 2: Fetch expenses and transactions in parallel
-        const [expensesData, transactionsData] = await Promise.all([
-            fetchExpenses(baseUrl, accessToken),
-            fetchTransactions(baseUrl, accessToken)
-        ]);
+        // Step 2: Fetch only transactions for now (skip expenses until we get this working)
+        const transactionsData = await fetchTransactions(baseUrl, accessToken);
 
         // Step 3: Return combined data
         res.status(200).json({
-            expenses: expensesData,
+            expenses: [], // Skip expenses for now
             transactions: transactionsData,
             lastUpdated: new Date().toISOString(),
             environment: environment
@@ -77,50 +74,9 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
     return tokenData.access_token;
 }
 
-// Fetch expenses from Ramp API
-async function fetchExpenses(baseUrl, accessToken) {
-    // Use a date range that definitely exists - last 6 months
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMonth(endDate.getMonth() - 6);
-    
-    const fromDate = startDate.toISOString().split('T')[0];
-    const toDate = endDate.toISOString().split('T')[0];
-    
-    const url = new URL(`${baseUrl}/developer/v1/reimbursements`);
-    url.searchParams.append('from_date', fromDate);
-    url.searchParams.append('to_date', toDate);
-    url.searchParams.append('limit', '100');
-    
-    const response = await fetch(url.toString(), {
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
-        }
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch expenses: ${response.status} ${errorText}`);
-    }
-
-    const data = await response.json();
-    return data.data || [];
-}
-
-// Fetch transactions from Ramp API
+// Fetch transactions from Ramp API (no date filter)
 async function fetchTransactions(baseUrl, accessToken) {
-    // Use a date range that definitely exists - last 6 months
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMonth(endDate.getMonth() - 6);
-    
-    const fromDate = startDate.toISOString().split('T')[0];
-    const toDate = endDate.toISOString().split('T')[0];
-    
     const url = new URL(`${baseUrl}/developer/v1/transactions`);
-    url.searchParams.append('from_date', fromDate);
-    url.searchParams.append('to_date', toDate);
     url.searchParams.append('limit', '100');
     
     const response = await fetch(url.toString(), {

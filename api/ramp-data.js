@@ -91,8 +91,16 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
 
 // Fetch ALL transactions with pagination
 async function fetchAllTransactions(baseUrl, accessToken) {
-    const startDate = '2025-01-01';
-    const endDate = new Date().toISOString().split('T')[0];
+    // Use proper date range - last 12 months
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setFullYear(endDate.getFullYear() - 1);
+    
+    // Format dates as YYYY-MM-DD
+    const fromDate = startDate.toISOString().split('T')[0];
+    const toDate = endDate.toISOString().split('T')[0];
+    
+    console.log(`Fetching transactions from ${fromDate} to ${toDate}`);
     
     let allTransactions = [];
     let nextCursor = null;
@@ -101,8 +109,8 @@ async function fetchAllTransactions(baseUrl, accessToken) {
     try {
         do {
             const url = new URL(`${baseUrl}/developer/v1/transactions`);
-            url.searchParams.append('from_date', startDate);
-            url.searchParams.append('to_date', endDate);
+            url.searchParams.append('from_date', fromDate);
+            url.searchParams.append('to_date', toDate);
             url.searchParams.append('limit', '100');
             
             if (nextCursor) {
@@ -154,8 +162,16 @@ async function fetchAllTransactions(baseUrl, accessToken) {
 
 // Fetch ALL expenses with pagination
 async function fetchAllExpenses(baseUrl, accessToken) {
-    const startDate = '2025-01-01';
-    const endDate = new Date().toISOString().split('T')[0];
+    // Use proper date range - last 12 months
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setFullYear(endDate.getFullYear() - 1);
+    
+    // Format dates as YYYY-MM-DD
+    const fromDate = startDate.toISOString().split('T')[0];
+    const toDate = endDate.toISOString().split('T')[0];
+    
+    console.log(`Fetching expenses from ${fromDate} to ${toDate}`);
     
     let allExpenses = [];
     let nextCursor = null;
@@ -164,8 +180,8 @@ async function fetchAllExpenses(baseUrl, accessToken) {
     try {
         do {
             const url = new URL(`${baseUrl}/developer/v1/reimbursements`);
-            url.searchParams.append('from_date', startDate);
-            url.searchParams.append('to_date', endDate);
+            url.searchParams.append('from_date', fromDate);
+            url.searchParams.append('to_date', toDate);
             url.searchParams.append('limit', '100');
             
             if (nextCursor) {

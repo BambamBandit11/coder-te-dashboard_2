@@ -89,19 +89,8 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
     }
 }
 
-// Fetch ALL transactions with pagination
+// Fetch ALL transactions with pagination (no date filter for now)
 async function fetchAllTransactions(baseUrl, accessToken) {
-    // Use proper date range - last 12 months
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setFullYear(endDate.getFullYear() - 1);
-    
-    // Format dates as YYYY-MM-DD
-    const fromDate = startDate.toISOString().split('T')[0];
-    const toDate = endDate.toISOString().split('T')[0];
-    
-    console.log(`Fetching transactions from ${fromDate} to ${toDate}`);
-    
     let allTransactions = [];
     let nextCursor = null;
     let pageCount = 0;
@@ -109,8 +98,6 @@ async function fetchAllTransactions(baseUrl, accessToken) {
     try {
         do {
             const url = new URL(`${baseUrl}/developer/v1/transactions`);
-            url.searchParams.append('from_date', fromDate);
-            url.searchParams.append('to_date', toDate);
             url.searchParams.append('limit', '100');
             
             if (nextCursor) {
@@ -141,11 +128,11 @@ async function fetchAllTransactions(baseUrl, accessToken) {
             pageCount++;
             
             console.log(`Page ${pageCount}: ${transactions.length} transactions, total: ${allTransactions.length}`);
-            console.log('Pagination info:', data.page || data.pagination || 'No pagination info');
+            console.log('Pagination info:', JSON.stringify(data.page || data.pagination || 'No pagination info'));
             
             // Safety limit
-            if (pageCount >= 50) {
-                console.log('Reached safety limit of 50 pages');
+            if (pageCount >= 10) {
+                console.log('Reached safety limit of 10 pages for testing');
                 break;
             }
             
@@ -160,19 +147,8 @@ async function fetchAllTransactions(baseUrl, accessToken) {
     }
 }
 
-// Fetch ALL expenses with pagination
+// Fetch ALL expenses with pagination (no date filter for now)
 async function fetchAllExpenses(baseUrl, accessToken) {
-    // Use proper date range - last 12 months
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setFullYear(endDate.getFullYear() - 1);
-    
-    // Format dates as YYYY-MM-DD
-    const fromDate = startDate.toISOString().split('T')[0];
-    const toDate = endDate.toISOString().split('T')[0];
-    
-    console.log(`Fetching expenses from ${fromDate} to ${toDate}`);
-    
     let allExpenses = [];
     let nextCursor = null;
     let pageCount = 0;
@@ -180,8 +156,6 @@ async function fetchAllExpenses(baseUrl, accessToken) {
     try {
         do {
             const url = new URL(`${baseUrl}/developer/v1/reimbursements`);
-            url.searchParams.append('from_date', fromDate);
-            url.searchParams.append('to_date', toDate);
             url.searchParams.append('limit', '100');
             
             if (nextCursor) {
@@ -214,8 +188,8 @@ async function fetchAllExpenses(baseUrl, accessToken) {
             console.log(`Page ${pageCount}: ${expenses.length} expenses, total: ${allExpenses.length}`);
             
             // Safety limit
-            if (pageCount >= 50) {
-                console.log('Reached safety limit of 50 pages');
+            if (pageCount >= 10) {
+                console.log('Reached safety limit of 10 pages for testing');
                 break;
             }
             

@@ -84,8 +84,9 @@ const endDate = new Date().toISOString().split('T')[0];
 
     
     const url = new URL(`${baseUrl}/developer/v1/reimbursements`);
-    url.searchParams.append('start_date', startDate);
-    url.searchParams.append('end_date', endDate);
+url.searchParams.append('from_date', startDate);
+url.searchParams.append('to_date', endDate);
+
     url.searchParams.append('limit', '50000');
     
     const response = await fetch(url.toString(), {
@@ -111,8 +112,9 @@ const endDate = new Date().toISOString().split('T')[0];
 
     
     const url = new URL(`${baseUrl}/developer/v1/transactions`);
-    url.searchParams.append('start_date', startDate);
-    url.searchParams.append('end_date', endDate);
+url.searchParams.append('from_date', startDate);
+url.searchParams.append('to_date', endDate);
+
     url.searchParams.append('limit', '50000');
     
     const response = await fetch(url.toString(), {

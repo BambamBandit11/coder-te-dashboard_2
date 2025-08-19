@@ -32,20 +32,17 @@ export default async function handler(req, res) {
         const accessToken = await getAccessToken(baseUrl, clientId, clientSecret);
         console.log('Successfully obtained access token');
         
-        // Step 2: Fetch transactions and expenses in parallel
-        const [transactionsData, expensesData] = await Promise.all([
-            fetchAllTransactions(baseUrl, accessToken),
-            fetchAllExpenses(baseUrl, accessToken)
-        ]);
+        // Step 2: Fetch only transactions for now
+        const transactionsData = await fetchAllTransactions(baseUrl, accessToken);
 
-        // Step 3: Return combined data
+        // Step 3: Return transaction data
         res.status(200).json({
             transactions: transactionsData,
-            expenses: expensesData,
+            expenses: [], // Empty for now
             lastUpdated: new Date().toISOString(),
             environment: environment,
             totalTransactions: transactionsData.length,
-            totalExpenses: expensesData.length
+            totalExpenses: 0
         });
 
     } catch (error) {
@@ -89,7 +86,7 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
     }
 }
 
-// Fetch ALL transactions with pagination (no date filter for now)
+// Fetch ALL transactions with pagination
 async function fetchAllTransactions(baseUrl, accessToken) {
     let allTransactions = [];
     let nextCursor = null;
@@ -120,6 +117,8 @@ async function fetchAllTransactions(baseUrl, accessToken) {
             }
 
             const data = await response.json();
+            console.log('Full API response structure:', JSON.stringify(data, null, 2));
+            
             const transactions = data.data || [];
             allTransactions = allTransactions.concat(transactions);
             
@@ -128,11 +127,11 @@ async function fetchAllTransactions(baseUrl, accessToken) {
             pageCount++;
             
             console.log(`Page ${pageCount}: ${transactions.length} transactions, total: ${allTransactions.length}`);
-            console.log('Pagination info:', JSON.stringify(data.page || data.pagination || 'No pagination info'));
+            console.log('Next cursor:', nextCursor);
             
-            // Safety limit
-            if (pageCount >= 10) {
-                console.log('Reached safety limit of 10 pages for testing');
+            // Safety limit for testing
+            if (pageCount >= 5) {
+                console.log('Reached safety limit of 5 pages for testing');
                 break;
             }
             
@@ -143,63 +142,6 @@ async function fetchAllTransactions(baseUrl, accessToken) {
         
     } catch (error) {
         console.error('Error in fetchAllTransactions:', error);
-        throw error;
-    }
-}
-
-// Fetch ALL expenses with pagination (no date filter for now)
-async function fetchAllExpenses(baseUrl, accessToken) {
-    let allExpenses = [];
-    let nextCursor = null;
-    let pageCount = 0;
-    
-    try {
-        do {
-            const url = new URL(`${baseUrl}/developer/v1/reimbursements`);
-            url.searchParams.append('limit', '100');
-            
-            if (nextCursor) {
-                url.searchParams.append('start', nextCursor);
-            }
-            
-            console.log(`Fetching expenses page ${pageCount + 1}:`, url.toString());
-            
-            const response = await fetch(url.toString(), {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Accept': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Expenses request failed:', response.status, errorText);
-                throw new Error(`Failed to fetch expenses: ${response.status} ${errorText}`);
-            }
-
-            const data = await response.json();
-            const expenses = data.data || [];
-            allExpenses = allExpenses.concat(expenses);
-            
-            // Check different possible pagination structures
-            nextCursor = data.page?.next || data.next_cursor || data.pagination?.next_cursor;
-            pageCount++;
-            
-            console.log(`Page ${pageCount}: ${expenses.length} expenses, total: ${allExpenses.length}`);
-            
-            // Safety limit
-            if (pageCount >= 10) {
-                console.log('Reached safety limit of 10 pages for testing');
-                break;
-            }
-            
-        } while (nextCursor);
-        
-        console.log(`Total expenses fetched: ${allExpenses.length}`);
-        return allExpenses;
-        
-    } catch (error) {
-        console.error('Error in fetchAllExpenses:', error);
         throw error;
     }
 }

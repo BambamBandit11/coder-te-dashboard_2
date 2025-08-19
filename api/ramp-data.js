@@ -26,122 +26,109 @@ export default async function handler(req, res) {
             ? 'https://demo-api.ramp.com'
             : 'https://api.ramp.com';
 
-        console.log('Starting Ramp API call with baseUrl:', baseUrl);
-        
         // Step 1: Get access token
         const accessToken = await getAccessToken(baseUrl, clientId, clientSecret);
-        console.log('Successfully obtained access token');
         
-        // Step 2: Fetch only transactions for now
-        const transactionsData = await fetchAllTransactions(baseUrl, accessToken);
+        // Step 2: Fetch expenses and transactions in parallel
+        const [expensesData, transactionsData] = await Promise.all([
+            fetchExpenses(baseUrl, accessToken),
+            fetchTransactions(baseUrl, accessToken)
+        ]);
 
-        // Step 3: Return transaction data
+        // Step 3: Return combined data
         res.status(200).json({
+            expenses: expensesData,
             transactions: transactionsData,
-            expenses: [], // Empty for now
             lastUpdated: new Date().toISOString(),
-            environment: environment,
-            totalTransactions: transactionsData.length,
-            totalExpenses: 0
+            environment: environment
         });
 
     } catch (error) {
-        console.error('Detailed error in handler:', error);
+        console.error('Error fetching Ramp data:', error);
         res.status(500).json({ 
             error: 'Failed to fetch data from Ramp API',
-            message: error.message,
-            details: error.stack
+            message: error.message
         });
     }
 }
 
 // Get OAuth access token using Client Credentials flow
 async function getAccessToken(baseUrl, clientId, clientSecret) {
-    try {
-        const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-        
-        const response = await fetch(`${baseUrl}/developer/v1/token`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Basic ${credentials}`,
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                'grant_type': 'client_credentials',
-                'scope': 'transactions:read reimbursements:read receipts:read users:read departments:read'
-            })
-        });
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    
+    const response = await fetch(`${baseUrl}/developer/v1/token`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Basic ${credentials}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+            'grant_type': 'client_credentials',
+            'scope': 'transactions:read reimbursements:read receipts:read users:read departments:read'
+        })
+    });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Token request failed:', response.status, errorText);
-            throw new Error(`Failed to get access token: ${response.status} ${errorText}`);
-        }
-
-        const tokenData = await response.json();
-        return tokenData.access_token;
-    } catch (error) {
-        console.error('Error in getAccessToken:', error);
-        throw error;
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to get access token: ${response.status} ${errorText}`);
     }
+
+    const tokenData = await response.json();
+    return tokenData.access_token;
 }
 
-// Fetch ALL transactions with pagination
-async function fetchAllTransactions(baseUrl, accessToken) {
-    let allTransactions = [];
-    let nextCursor = null;
-    let pageCount = 0;
+// Fetch expenses from Ramp API
+async function fetchExpenses(baseUrl, accessToken) {
+const startDate = '2025-01-01';
+const endDate = new Date().toISOString().split('T')[0];
+
     
-    try {
-        do {
-            const url = new URL(`${baseUrl}/developer/v1/transactions`);
-            url.searchParams.append('limit', '100');
-            
-            if (nextCursor) {
-                url.searchParams.append('start', nextCursor);
-            }
-            
-            console.log(`Fetching transactions page ${pageCount + 1}:`, url.toString());
-            
-            const response = await fetch(url.toString(), {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Accept': 'application/json'
-                }
-            });
+    const url = new URL(`${baseUrl}/developer/v1/reimbursements`);
+url.searchParams.append('from_date', startDate);
+url.searchParams.append('to_date', endDate);
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Transactions request failed:', response.status, errorText);
-                throw new Error(`Failed to fetch transactions: ${response.status} ${errorText}`);
-            }
+    url.searchParams.append('limit', '50000');
+    
+    const response = await fetch(url.toString(), {
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+        }
+    });
 
-            const data = await response.json();
-            console.log('Full API response structure:', JSON.stringify(data, null, 2));
-            
-            const transactions = data.data || [];
-            allTransactions = allTransactions.concat(transactions);
-            
-            // Check different possible pagination structures
-            nextCursor = data.page?.next || data.next_cursor || data.pagination?.next_cursor;
-            pageCount++;
-            
-            console.log(`Page ${pageCount}: ${transactions.length} transactions, total: ${allTransactions.length}`);
-            console.log('Next cursor:', nextCursor);
-            
-            // Safety limit for testing
-            if (pageCount >= 5) {
-                console.log('Reached safety limit of 5 pages for testing');
-                break;
-            }
-            
-        } while (nextCursor);
-        
-        console.log(`Total transactions fetched: ${allTransactions.length}`);
-        return allTransactions;
-        
-    } catch (error) {
-        console.error('Error in fetchAllTransactions:', error);
-        throw error;
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch expenses: ${response.status} ${errorText}`);
     }
+
+    const data = await response.json();
+    return data.data || [];
+}
+
+// Fetch transactions from Ramp API
+async function fetchTransactions(baseUrl, accessToken) {
+const startDate = '2025-01-01';
+const endDate = new Date().toISOString().split('T')[0];
+
+    
+    const url = new URL(`${baseUrl}/developer/v1/transactions`);
+url.searchParams.append('from_date', startDate);
+url.searchParams.append('to_date', endDate);
+
+    url.searchParams.append('limit', '50000');
+    
+    const response = await fetch(url.toString(), {
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+        }
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch transactions: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data.data || [];
 }

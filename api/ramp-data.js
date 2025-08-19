@@ -29,15 +29,20 @@ export default async function handler(req, res) {
         // Step 1: Get access token
         const accessToken = await getAccessToken(baseUrl, clientId, clientSecret);
         
-        // Step 2: Fetch transactions (no date filter)
-        const transactionsData = await fetchTransactions(baseUrl, accessToken);
+        // Step 2: Fetch transactions and show pagination info
+        const result = await fetchTransactionsWithPaginationInfo(baseUrl, accessToken);
 
-        // Step 3: Return combined data
+        // Step 3: Return combined data with debug info
         res.status(200).json({
-            expenses: [], // Skip expenses for now
-            transactions: transactionsData,
+            expenses: [],
+            transactions: result.transactions,
             lastUpdated: new Date().toISOString(),
-            environment: environment
+            environment: environment,
+            debug: {
+                paginationInfo: result.paginationInfo,
+                totalTransactions: result.transactions.length,
+                hasMorePages: result.hasMorePages
+            }
         });
 
     } catch (error) {
@@ -74,10 +79,10 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
     return tokenData.access_token;
 }
 
-// Fetch transactions from Ramp API (no date filter)
-async function fetchTransactions(baseUrl, accessToken) {
+// Fetch transactions and show pagination structure
+async function fetchTransactionsWithPaginationInfo(baseUrl, accessToken) {
     const url = new URL(`${baseUrl}/developer/v1/transactions`);
-    url.searchParams.append('limit', '100');
+    url.searchParams.append('limit', '20'); // Use smaller limit to ensure we get pagination
     
     const response = await fetch(url.toString(), {
         headers: {
@@ -92,5 +97,28 @@ async function fetchTransactions(baseUrl, accessToken) {
     }
 
     const data = await response.json();
-    return data.data || [];
+    const transactions = data.data || [];
+    
+    // Extract all possible pagination info
+    const paginationInfo = {
+        page: data.page || null,
+        pagination: data.pagination || null,
+        next: data.next || null,
+        next_cursor: data.next_cursor || null,
+        has_more: data.has_more || null,
+        total: data.total || null,
+        count: data.count || null,
+        fullResponseKeys: Object.keys(data)
+    };
+    
+    const hasMorePages = !!(data.page?.next || data.next_cursor || data.has_more);
+    
+    console.log('Pagination info:', JSON.stringify(paginationInfo, null, 2));
+    console.log('Has more pages:', hasMorePages);
+    
+    return {
+        transactions,
+        paginationInfo,
+        hasMorePages
+    };
 }

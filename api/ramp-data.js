@@ -26,85 +26,111 @@ export default async function handler(req, res) {
             ? 'https://demo-api.ramp.com'
             : 'https://api.ramp.com';
 
+        console.log('Starting Ramp API call...');
+        
         // Step 1: Get access token
         const accessToken = await getAccessToken(baseUrl, clientId, clientSecret);
+        console.log('Got access token successfully');
         
-        // Step 2: Fetch just one page first to see the structure
-        const debugResponse = await fetchTransactionsDebug(baseUrl, accessToken);
+        // Step 2: Fetch transactions with better error handling
+        const transactionsResult = await fetchTransactionsWithDebug(baseUrl, accessToken);
 
         // Step 3: Return debug info
         res.status(200).json({
-            debug: debugResponse,
+            success: true,
+            debug: transactionsResult,
             lastUpdated: new Date().toISOString(),
             environment: environment
         });
 
     } catch (error) {
-        console.error('Error fetching Ramp data:', error);
+        console.error('Detailed error:', error);
         res.status(500).json({ 
             error: 'Failed to fetch data from Ramp API',
-            message: error.message
+            message: error.message,
+            stack: error.stack
         });
     }
 }
 
 // Get OAuth access token using Client Credentials flow
 async function getAccessToken(baseUrl, clientId, clientSecret) {
-    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    
-    const response = await fetch(`${baseUrl}/developer/v1/token`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-            'grant_type': 'client_credentials',
-            'scope': 'transactions:read reimbursements:read receipts:read users:read departments:read'
-        })
-    });
+    try {
+        const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+        
+        console.log('Requesting token from:', `${baseUrl}/developer/v1/token`);
+        
+        const response = await fetch(`${baseUrl}/developer/v1/token`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Basic ${credentials}`,
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                'grant_type': 'client_credentials',
+                'scope': 'transactions:read reimbursements:read receipts:read users:read departments:read'
+            })
+        });
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to get access token: ${response.status} ${errorText}`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Token request failed:', response.status, errorText);
+            throw new Error(`Failed to get access token: ${response.status} ${errorText}`);
+        }
+
+        const tokenData = await response.json();
+        return tokenData.access_token;
+    } catch (error) {
+        console.error('Error in getAccessToken:', error);
+        throw error;
     }
-
-    const tokenData = await response.json();
-    return tokenData.access_token;
 }
 
-// Debug function to see the full response structure
-async function fetchTransactionsDebug(baseUrl, accessToken) {
-    const startDate = '2025-01-01';
-    const endDate = new Date().toISOString().split('T')[0];
-    
-    const url = new URL(`${baseUrl}/developer/v1/transactions`);
-    url.searchParams.append('from_date', startDate);
-    url.searchParams.append('to_date', endDate);
-    url.searchParams.append('limit', '50');
-    
-    const response = await fetch(url.toString(), {
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
-        }
-    });
+// Fetch transactions with detailed debugging
+async function fetchTransactionsWithDebug(baseUrl, accessToken) {
+    try {
+        const startDate = '2025-01-01';
+        const endDate = new Date().toISOString().split('T')[0];
+        
+        const url = new URL(`${baseUrl}/developer/v1/transactions`);
+        url.searchParams.append('from_date', startDate);
+        url.searchParams.append('to_date', endDate);
+        url.searchParams.append('limit', '50');
+        
+        console.log('Fetching transactions from:', url.toString());
+        
+        const response = await fetch(url.toString(), {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch transactions: ${response.status} ${errorText}`);
+        console.log('Response status:', response.status);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Transactions request failed:', response.status, errorText);
+            throw new Error(`Failed to fetch transactions: ${response.status} ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('Response data keys:', Object.keys(data));
+        console.log('Data array length:', data.data?.length);
+        
+        return {
+            totalRecords: data.data?.length || 0,
+            sampleTransaction: data.data?.[0] || null,
+            paginationInfo: data.page || null,
+            fullResponseStructure: {
+                hasData: !!data.data,
+                hasPage: !!data.page,
+                topLevelKeys: Object.keys(data)
+            }
+        };
+    } catch (error) {
+        console.error('Error in fetchTransactionsWithDebug:', error);
+        throw error;
     }
-
-    const data = await response.json();
-    
-    return {
-        totalRecords: data.data?.length || 0,
-        fullResponse: data,
-        paginationInfo: {
-            hasPage: !!data.page,
-            pageStructure: data.page,
-            hasNext: data.page?.next,
-            hasPrevious: data.page?.previous
-        }
-    };
 }

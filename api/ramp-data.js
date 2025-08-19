@@ -29,15 +29,16 @@ export default async function handler(req, res) {
         // Step 1: Get access token
         const accessToken = await getAccessToken(baseUrl, clientId, clientSecret);
         
-        // Step 2: Fetch only transactions for now (skip expenses until we get this working)
-        const transactionsData = await fetchTransactions(baseUrl, accessToken);
+        // Step 2: Fetch ALL transactions with pagination
+        const transactionsData = await fetchAllTransactions(baseUrl, accessToken);
 
         // Step 3: Return combined data
         res.status(200).json({
             expenses: [], // Skip expenses for now
             transactions: transactionsData,
             lastUpdated: new Date().toISOString(),
-            environment: environment
+            environment: environment,
+            totalTransactions: transactionsData.length
         });
 
     } catch (error) {
@@ -74,23 +75,52 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
     return tokenData.access_token;
 }
 
-// Fetch transactions from Ramp API (no date filter)
-async function fetchTransactions(baseUrl, accessToken) {
-    const url = new URL(`${baseUrl}/developer/v1/transactions`);
-    url.searchParams.append('limit', '100');
+// Fetch ALL transactions with pagination
+async function fetchAllTransactions(baseUrl, accessToken) {
+    let allTransactions = [];
+    let nextCursor = null;
+    let pageCount = 0;
     
-    const response = await fetch(url.toString(), {
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
+    do {
+        const url = new URL(`${baseUrl}/developer/v1/transactions`);
+        url.searchParams.append('limit', '100');
+        
+        if (nextCursor) {
+            url.searchParams.append('start', nextCursor);
         }
-    });
+        
+        console.log(`Fetching page ${pageCount + 1}...`);
+        
+        const response = await fetch(url.toString(), {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch transactions: ${response.status} ${errorText}`);
-    }
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch transactions: ${response.status} ${errorText}`);
+        }
 
-    const data = await response.json();
-    return data.data || [];
+        const data = await response.json();
+        const transactions = data.data || [];
+        allTransactions = allTransactions.concat(transactions);
+        
+        // Look for pagination cursor in the response
+        nextCursor = data.page?.next;
+        pageCount++;
+        
+        console.log(`Page ${pageCount}: Got ${transactions.length} transactions, total: ${allTransactions.length}`);
+        
+        // Safety limit to prevent infinite loops
+        if (pageCount >= 20) {
+            console.log('Reached safety limit of 20 pages');
+            break;
+        }
+        
+    } while (nextCursor);
+    
+    console.log(`Final total: ${allTransactions.length} transactions`);
+    return allTransactions;
 }

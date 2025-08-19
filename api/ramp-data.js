@@ -79,15 +79,18 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
 
 // Fetch expenses from Ramp API
 async function fetchExpenses(baseUrl, accessToken) {
-const startDate = '2025-01-01';
-const endDate = new Date().toISOString().split('T')[0];
-
+    // Use a date range that definitely exists - last 6 months
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(endDate.getMonth() - 6);
+    
+    const fromDate = startDate.toISOString().split('T')[0];
+    const toDate = endDate.toISOString().split('T')[0];
     
     const url = new URL(`${baseUrl}/developer/v1/reimbursements`);
-url.searchParams.append('from_date', startDate);
-url.searchParams.append('to_date', endDate);
-
-    url.searchParams.append('limit', '50000');
+    url.searchParams.append('from_date', fromDate);
+    url.searchParams.append('to_date', toDate);
+    url.searchParams.append('limit', '100');
     
     const response = await fetch(url.toString(), {
         headers: {
@@ -107,15 +110,18 @@ url.searchParams.append('to_date', endDate);
 
 // Fetch transactions from Ramp API
 async function fetchTransactions(baseUrl, accessToken) {
-const startDate = '2025-01-01';
-const endDate = new Date().toISOString().split('T')[0];
-
+    // Use a date range that definitely exists - last 6 months
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(endDate.getMonth() - 6);
+    
+    const fromDate = startDate.toISOString().split('T')[0];
+    const toDate = endDate.toISOString().split('T')[0];
     
     const url = new URL(`${baseUrl}/developer/v1/transactions`);
-url.searchParams.append('from_date', startDate);
-url.searchParams.append('to_date', endDate);
-
-    url.searchParams.append('limit', '50000');
+    url.searchParams.append('from_date', fromDate);
+    url.searchParams.append('to_date', toDate);
+    url.searchParams.append('limit', '100');
     
     const response = await fetch(url.toString(), {
         headers: {

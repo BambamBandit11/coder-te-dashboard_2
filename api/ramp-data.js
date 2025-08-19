@@ -79,9 +79,9 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
 
 // Fetch expenses from Ramp API
 async function fetchExpenses(baseUrl, accessToken) {
-    const currentYear = new Date().getFullYear();
-    const startDate = `${currentYear}-01-01`;
-    const endDate = new Date().toISOString().split('T')[0];
+const startDate = '2025-01-01';
+const endDate = new Date().toISOString().split('T')[0];
+
     
     const url = new URL(`${baseUrl}/developer/v1/reimbursements`);
     url.searchParams.append('start_date', startDate);
@@ -106,9 +106,9 @@ async function fetchExpenses(baseUrl, accessToken) {
 
 // Fetch transactions from Ramp API
 async function fetchTransactions(baseUrl, accessToken) {
-    const currentYear = new Date().getFullYear();
-    const startDate = `${currentYear}-01-01`;
-    const endDate = new Date().toISOString().split('T')[0];
+const startDate = '2025-01-01';
+const endDate = new Date().toISOString().split('T')[0];
+
     
     const url = new URL(`${baseUrl}/developer/v1/transactions`);
     url.searchParams.append('start_date', startDate);

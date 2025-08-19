@@ -29,16 +29,15 @@ export default async function handler(req, res) {
         // Step 1: Get access token
         const accessToken = await getAccessToken(baseUrl, clientId, clientSecret);
         
-        // Step 2: Fetch transactions and filter for Peggy Mathison
+        // Step 2: Fetch transactions (no date filter)
         const transactionsData = await fetchTransactions(baseUrl, accessToken);
 
-        // Step 3: Return filtered data
+        // Step 3: Return combined data
         res.status(200).json({
-            expenses: [], // Skip expenses
+            expenses: [], // Skip expenses for now
             transactions: transactionsData,
             lastUpdated: new Date().toISOString(),
-            environment: environment,
-            totalTransactions: transactionsData.length
+            environment: environment
         });
 
     } catch (error) {
@@ -75,7 +74,7 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
     return tokenData.access_token;
 }
 
-// Fetch transactions and filter for Peggy Mathison only
+// Fetch transactions from Ramp API (no date filter)
 async function fetchTransactions(baseUrl, accessToken) {
     const url = new URL(`${baseUrl}/developer/v1/transactions`);
     url.searchParams.append('limit', '100');
@@ -93,17 +92,5 @@ async function fetchTransactions(baseUrl, accessToken) {
     }
 
     const data = await response.json();
-    const allTransactions = data.data || [];
-    
-    // Filter for Peggy Mathison only
-    const peggyTransactions = allTransactions.filter(transaction => {
-        const firstName = transaction.user?.first_name || '';
-        const lastName = transaction.user?.last_name || '';
-        const fullName = `${firstName} ${lastName}`.trim();
-        return fullName === 'Peggy Mathison';
-    });
-    
-    console.log(`Total transactions: ${allTransactions.length}, Peggy's transactions: ${peggyTransactions.length}`);
-    
-    return peggyTransactions;
+    return data.data || [];
 }

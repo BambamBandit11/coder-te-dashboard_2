@@ -31,8 +31,8 @@ export default async function handler(req, res) {
         
         // Step 2: Fetch expenses and transactions in parallel
         const [expensesData, transactionsData] = await Promise.all([
-            fetchExpenses(baseUrl, accessToken),
-            fetchTransactions(baseUrl, accessToken)
+            fetchAllExpenses(baseUrl, accessToken),
+            fetchAllTransactions(baseUrl, accessToken)
         ]);
 
         // Step 3: Return combined data
@@ -40,7 +40,9 @@ export default async function handler(req, res) {
             expenses: expensesData,
             transactions: transactionsData,
             lastUpdated: new Date().toISOString(),
-            environment: environment
+            environment: environment,
+            totalExpenses: expensesData.length,
+            totalTransactions: transactionsData.length
         });
 
     } catch (error) {
@@ -77,58 +79,94 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
     return tokenData.access_token;
 }
 
-// Fetch expenses from Ramp API
-async function fetchExpenses(baseUrl, accessToken) {
-const startDate = '2025-01-01';
-const endDate = new Date().toISOString().split('T')[0];
-
+// Fetch ALL expenses from Ramp API with pagination
+async function fetchAllExpenses(baseUrl, accessToken) {
+    const startDate = '2025-01-01';
+    const endDate = new Date().toISOString().split('T')[0];
     
-    const url = new URL(`${baseUrl}/developer/v1/reimbursements`);
-url.searchParams.append('from_date', startDate);
-url.searchParams.append('to_date', endDate);
-
-    url.searchParams.append('limit', '50000');
+    let allExpenses = [];
+    let nextCursor = null;
+    let pageCount = 0;
     
-    const response = await fetch(url.toString(), {
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
+    do {
+        const url = new URL(`${baseUrl}/developer/v1/reimbursements`);
+        url.searchParams.append('from_date', startDate);
+        url.searchParams.append('to_date', endDate);
+        url.searchParams.append('limit', '100'); // Use reasonable page size
+        
+        if (nextCursor) {
+            url.searchParams.append('start', nextCursor);
         }
-    });
+        
+        const response = await fetch(url.toString(), {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch expenses: ${response.status} ${errorText}`);
-    }
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch expenses: ${response.status} ${errorText}`);
+        }
 
-    const data = await response.json();
-    return data.data || [];
+        const data = await response.json();
+        const expenses = data.data || [];
+        allExpenses = allExpenses.concat(expenses);
+        
+        nextCursor = data.page?.next;
+        pageCount++;
+        
+        console.log(`Fetched expenses page ${pageCount}: ${expenses.length} records, total so far: ${allExpenses.length}`);
+        
+    } while (nextCursor && pageCount < 100); // Safety limit to prevent infinite loops
+    
+    console.log(`Total expenses fetched: ${allExpenses.length}`);
+    return allExpenses;
 }
 
-// Fetch transactions from Ramp API
-async function fetchTransactions(baseUrl, accessToken) {
-const startDate = '2025-01-01';
-const endDate = new Date().toISOString().split('T')[0];
-
+// Fetch ALL transactions from Ramp API with pagination
+async function fetchAllTransactions(baseUrl, accessToken) {
+    const startDate = '2025-01-01';
+    const endDate = new Date().toISOString().split('T')[0];
     
-    const url = new URL(`${baseUrl}/developer/v1/transactions`);
-url.searchParams.append('from_date', startDate);
-url.searchParams.append('to_date', endDate);
-
-    url.searchParams.append('limit', '50000');
+    let allTransactions = [];
+    let nextCursor = null;
+    let pageCount = 0;
     
-    const response = await fetch(url.toString(), {
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
+    do {
+        const url = new URL(`${baseUrl}/developer/v1/transactions`);
+        url.searchParams.append('from_date', startDate);
+        url.searchParams.append('to_date', endDate);
+        url.searchParams.append('limit', '100'); // Use reasonable page size
+        
+        if (nextCursor) {
+            url.searchParams.append('start', nextCursor);
         }
-    });
+        
+        const response = await fetch(url.toString(), {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch transactions: ${response.status} ${errorText}`);
-    }
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch transactions: ${response.status} ${errorText}`);
+        }
 
-    const data = await response.json();
-    return data.data || [];
+        const data = await response.json();
+        const transactions = data.data || [];
+        allTransactions = allTransactions.concat(transactions);
+        
+        nextCursor = data.page?.next;
+        pageCount++;
+        
+        console.log(`Fetched transactions page ${pageCount}: ${transactions.length} records, total so far: ${allTransactions.length}`);
+        
+    } while (nextCursor && pageCount < 100); // Safety limit to prevent infinite loops
+    
+    console.log(`Total transactions fetched: ${allTransactions.length}`);
+    return allTransactions;
 }

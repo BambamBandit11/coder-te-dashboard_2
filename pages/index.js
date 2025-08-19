@@ -70,7 +70,7 @@ export default function Dashboard() {
       allTransactions.push({
         id: expense.id,
         date: new Date(expense.created_time || expense.user_transaction_time),
-        amount: expense.amount / 100,
+        amount: expense.amount ,
         employee: expense.user ? `${expense.user.first_name} ${expense.user.last_name}` : 'Unknown',
         department: expense.user?.department_name || 'Unknown',
         merchant: expense.merchant?.name || expense.merchant_name || 'Unknown',
@@ -83,7 +83,7 @@ export default function Dashboard() {
       allTransactions.push({
         id: transaction.id,
         date: new Date(transaction.user_transaction_time),
-        amount: transaction.amount / 100,
+        amount: transaction.amount ,
         employee: transaction.card_holder ? 
           `${transaction.card_holder.first_name} ${transaction.card_holder.last_name}` : 'Unknown',
         department: transaction.card_holder?.department_name || 'Unknown',

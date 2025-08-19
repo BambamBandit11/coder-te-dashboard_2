@@ -29,12 +29,12 @@ export default async function handler(req, res) {
         // Step 1: Get access token
         const accessToken = await getAccessToken(baseUrl, clientId, clientSecret);
         
-        // Step 2: Fetch ALL transactions with pagination
-        const transactionsData = await fetchAllTransactions(baseUrl, accessToken);
+        // Step 2: Fetch transactions and filter for Peggy Mathison
+        const transactionsData = await fetchTransactions(baseUrl, accessToken);
 
-        // Step 3: Return combined data
+        // Step 3: Return filtered data
         res.status(200).json({
-            expenses: [], // Skip expenses for now
+            expenses: [], // Skip expenses
             transactions: transactionsData,
             lastUpdated: new Date().toISOString(),
             environment: environment,
@@ -75,52 +75,35 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
     return tokenData.access_token;
 }
 
-// Fetch ALL transactions with pagination
-async function fetchAllTransactions(baseUrl, accessToken) {
-    let allTransactions = [];
-    let nextCursor = null;
-    let pageCount = 0;
+// Fetch transactions and filter for Peggy Mathison only
+async function fetchTransactions(baseUrl, accessToken) {
+    const url = new URL(`${baseUrl}/developer/v1/transactions`);
+    url.searchParams.append('limit', '100');
     
-    do {
-        const url = new URL(`${baseUrl}/developer/v1/transactions`);
-        url.searchParams.append('limit', '100');
-        
-        if (nextCursor) {
-            url.searchParams.append('start', nextCursor);
+    const response = await fetch(url.toString(), {
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
         }
-        
-        console.log(`Fetching page ${pageCount + 1}...`);
-        
-        const response = await fetch(url.toString(), {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Accept': 'application/json'
-            }
-        });
+    });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to fetch transactions: ${response.status} ${errorText}`);
-        }
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch transactions: ${response.status} ${errorText}`);
+    }
 
-        const data = await response.json();
-        const transactions = data.data || [];
-        allTransactions = allTransactions.concat(transactions);
-        
-        // Look for pagination cursor in the response
-        nextCursor = data.page?.next;
-        pageCount++;
-        
-        console.log(`Page ${pageCount}: Got ${transactions.length} transactions, total: ${allTransactions.length}`);
-        
-        // Safety limit to prevent infinite loops
-        if (pageCount >= 20) {
-            console.log('Reached safety limit of 20 pages');
-            break;
-        }
-        
-    } while (nextCursor);
+    const data = await response.json();
+    const allTransactions = data.data || [];
     
-    console.log(`Final total: ${allTransactions.length} transactions`);
-    return allTransactions;
+    // Filter for Peggy Mathison only
+    const peggyTransactions = allTransactions.filter(transaction => {
+        const firstName = transaction.user?.first_name || '';
+        const lastName = transaction.user?.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        return fullName === 'Peggy Mathison';
+    });
+    
+    console.log(`Total transactions: ${allTransactions.length}, Peggy's transactions: ${peggyTransactions.length}`);
+    
+    return peggyTransactions;
 }

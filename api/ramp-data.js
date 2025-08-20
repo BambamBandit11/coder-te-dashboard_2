@@ -31,14 +31,18 @@ export default async function handler(req, res) {
         
         // Step 2: Fetch ALL transactions with proper pagination
         const transactionsData = await fetchAllTransactions(baseUrl, accessToken);
+        
+        // Step 3: Fetch ALL reimbursements with proper pagination
+        const reimbursementsData = await fetchAllReimbursements(baseUrl, accessToken);
 
-        // Step 3: Return combined data
+        // Step 4: Return combined data
         res.status(200).json({
-            expenses: [], // Skip expenses for now
+            expenses: reimbursementsData, // Now returning actual reimbursements data
             transactions: transactionsData,
             lastUpdated: new Date().toISOString(),
             environment: environment,
-            totalTransactions: transactionsData.length
+            totalTransactions: transactionsData.length,
+            totalReimbursements: reimbursementsData.length
         });
 
     } catch (error) {
@@ -118,4 +122,49 @@ async function fetchAllTransactions(baseUrl, accessToken) {
     
     console.log(`Final total: ${allTransactions.length} transactions`);
     return allTransactions;
+}
+
+// Fetch ALL reimbursements with proper pagination
+async function fetchAllReimbursements(baseUrl, accessToken) {
+    let allReimbursements = [];
+    let nextUrl = `${baseUrl}/developer/v1/reimbursements?limit=100`;
+    let pageCount = 0;
+    
+    while (nextUrl && pageCount < 20) { // Safety limit of 20 pages
+        console.log(`Fetching reimbursements page ${pageCount + 1}: ${nextUrl}`);
+        
+        const response = await fetch(nextUrl, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch reimbursements: ${response.status} ${errorText}`);
+        }
+
+        const data = await response.json();
+        const reimbursements = data.data || [];
+        allReimbursements = allReimbursements.concat(reimbursements);
+        
+        // Get the next page URL from Ramp's response
+        nextUrl = data.page?.next || null;
+        pageCount++;
+        
+        console.log(`Reimbursements page ${pageCount}: Got ${reimbursements.length} reimbursements, total: ${allReimbursements.length}`);
+        
+        if (!nextUrl) {
+            console.log('No more reimbursement pages available');
+            break;
+        }
+    }
+    
+    if (pageCount >= 20) {
+        console.log('Reached safety limit of 20 pages for reimbursements');
+    }
+    
+    console.log(`Final reimbursements total: ${allReimbursements.length} reimbursements`);
+    return allReimbursements;
 }

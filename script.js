@@ -216,9 +216,13 @@ class TEDashboard {
             .filter(t => t.date.getFullYear() === currentYear && t.date.getMonth() === currentMonth)
             .reduce((sum, t) => sum + t.amount, 0);
         
+        // Calculate reimbursement count
+        const reimbursementCount = data.filter(t => t.type === 'expense').length;
+        
         document.getElementById('total-spend').textContent = this.formatCurrency(ytdTotal);
         document.getElementById('month-spend').textContent = this.formatCurrency(monthTotal);
         document.getElementById('transaction-count').textContent = data.length.toLocaleString();
+        document.getElementById('reimbursement-count').textContent = reimbursementCount.toLocaleString();
     }
 
     updateDepartmentChart(data) {
@@ -328,13 +332,14 @@ class TEDashboard {
                 <td>${transaction.merchant}</td>
                 <td class="amount-cell">${this.formatCurrency(transaction.amount)}</td>
                 <td>${transaction.location}</td>
+                <td><span class="type-badge type-${transaction.type}">${transaction.type === 'expense' ? 'Reimbursement' : 'Transaction'}</span></td>
             `;
             tbody.appendChild(row);
         });
         
         if (recentTransactions.length === 0) {
             const row = document.createElement('tr');
-            row.innerHTML = '<td colspan="6" style="text-align: center; color: #6b7280; font-style: italic;">No transactions found</td>';
+            row.innerHTML = '<td colspan="7" style="text-align: center; color: #6b7280; font-style: italic;">No transactions found</td>';
             tbody.appendChild(row);
         }
     }

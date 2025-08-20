@@ -21,6 +21,15 @@ class TEDashboard {
         document.getElementById('employee-filter').addEventListener('change', () => this.applyFilters());
         document.getElementById('month-filter').addEventListener('change', () => this.applyFilters());
         document.getElementById('merchant-filter').addEventListener('change', () => this.applyFilters());
+        document.getElementById('category-filter').addEventListener('change', () => this.applyFilters());
+        
+        // Modal events
+        document.getElementById('modal-close').addEventListener('click', () => this.closeModal());
+        document.getElementById('transaction-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'transaction-modal') {
+                this.closeModal();
+            }
+        });
     }
 
     async loadData() {
@@ -80,6 +89,14 @@ class TEDashboard {
         
         // Process expenses
         this.data.expenses.forEach(expense => {
+            // Extract accounting category (GL Account) for expenses
+            const glAccount = expense.accounting_categories?.find(cat => 
+                cat.tracking_category_remote_type === 'GL_ACCOUNT'
+            );
+            
+            // Extract location information
+            const location = expense.location?.name || expense.user?.location_name || 'Unknown';
+            
             allTransactions.push({
                 id: expense.id,
                 date: new Date(expense.created_time || expense.user_transaction_time),
@@ -88,13 +105,28 @@ class TEDashboard {
                 employee: expense.user ? `${expense.user.first_name} ${expense.user.last_name}` : 'Unknown',
                 department: expense.user?.department_name || 'Unknown',
                 merchant: expense.merchant?.name || expense.merchant_name || 'Unknown',
-                location: expense.location?.name || 'Unknown',
-                type: 'expense'
+                location: location,
+                type: 'expense',
+                // Enhanced fields
+                accountingCategory: glAccount?.category_name || 'Uncategorized',
+                merchantDescriptor: expense.merchant?.name || expense.merchant_name || 'Unknown',
+                state: expense.state || 'Unknown',
+                cardHolderLocation: expense.user?.location_name || 'Unknown'
             });
         });
         
         // Process transactions
         this.data.transactions.forEach(transaction => {
+            // Extract accounting category (GL Account)
+            const glAccount = transaction.accounting_categories?.find(cat => 
+                cat.tracking_category_remote_type === 'GL_ACCOUNT'
+            );
+            
+            // Extract merchant location
+            const merchantLocation = transaction.merchant_location;
+            const locationString = [merchantLocation?.city, merchantLocation?.state, merchantLocation?.country]
+                .filter(Boolean).join(', ') || 'Unknown';
+            
             allTransactions.push({
                 id: transaction.id,
                 date: new Date(transaction.user_transaction_time),
@@ -104,8 +136,13 @@ class TEDashboard {
                     `${transaction.card_holder.first_name} ${transaction.card_holder.last_name}` : 'Unknown',
                 department: transaction.card_holder?.department_name || 'Unknown',
                 merchant: transaction.merchant_name || 'Unknown',
-                location: transaction.card_holder?.location_name || 'Unknown',
-                type: 'transaction'
+                location: locationString,
+                type: 'transaction',
+                // Enhanced fields
+                accountingCategory: glAccount?.category_name || 'Uncategorized',
+                merchantDescriptor: transaction.merchant_descriptor || transaction.merchant_name || 'Unknown',
+                state: transaction.state || 'Unknown',
+                cardHolderLocation: transaction.card_holder?.location_name || 'Unknown'
             });
         });
         
@@ -121,10 +158,12 @@ class TEDashboard {
         const departments = [...new Set(this.filteredData.map(t => t.department))].sort();
         const employees = [...new Set(this.filteredData.map(t => t.employee))].sort();
         const merchants = [...new Set(this.filteredData.map(t => t.merchant))].sort();
+        const categories = [...new Set(this.filteredData.map(t => t.accountingCategory))].sort();
         
         this.populateSelect('department-filter', departments);
         this.populateSelect('employee-filter', employees);
         this.populateSelect('merchant-filter', merchants);
+        this.populateSelect('category-filter', categories);
     }
 
     populateSelect(selectId, options) {
@@ -172,6 +211,7 @@ class TEDashboard {
         const employeeFilter = document.getElementById('employee-filter').value;
         const monthFilter = document.getElementById('month-filter').value;
         const merchantFilter = document.getElementById('merchant-filter').value;
+        const categoryFilter = document.getElementById('category-filter').value;
         
         let filtered = [...this.filteredData];
         
@@ -194,6 +234,10 @@ class TEDashboard {
         
         if (merchantFilter !== 'all') {
             filtered = filtered.filter(t => t.merchant === merchantFilter);
+        }
+        
+        if (categoryFilter !== 'all') {
+            filtered = filtered.filter(t => t.accountingCategory === categoryFilter);
         }
         
         this.updateSummary(filtered);
@@ -323,7 +367,7 @@ class TEDashboard {
         // Show latest 50 transactions
         const recentTransactions = data.slice(0, 50);
         
-        recentTransactions.forEach(transaction => {
+        recentTransactions.forEach((transaction, index) => {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${transaction.date.toLocaleDateString()}</td>
@@ -334,6 +378,10 @@ class TEDashboard {
                 <td>${transaction.location}</td>
                 <td><span class="type-badge type-${transaction.type}">${transaction.type === 'expense' ? 'Reimbursement' : 'Transaction'}</span></td>
             `;
+            
+            // Add click handler to show transaction details
+            row.addEventListener('click', () => this.showTransactionDetails(transaction));
+            
             tbody.appendChild(row);
         });
         
@@ -342,6 +390,51 @@ class TEDashboard {
             row.innerHTML = '<td colspan="7" style="text-align: center; color: #6b7280; font-style: italic;">No transactions found</td>';
             tbody.appendChild(row);
         }
+    }
+    
+    showTransactionDetails(transaction) {
+        const modal = document.getElementById('transaction-modal');
+        const modalBody = document.getElementById('modal-body');
+        
+        modalBody.innerHTML = `
+            <div class="detail-grid">
+                <div class="detail-label">Date:</div>
+                <div class="detail-value">${transaction.date.toLocaleDateString()}</div>
+                
+                <div class="detail-label">Employee:</div>
+                <div class="detail-value">${transaction.employee}</div>
+                
+                <div class="detail-label">Department:</div>
+                <div class="detail-value">${transaction.department}</div>
+                
+                <div class="detail-label">Amount:</div>
+                <div class="detail-value">${this.formatCurrency(transaction.amount)}</div>
+                
+                <div class="detail-label">Merchant:</div>
+                <div class="detail-value">${transaction.merchantDescriptor}</div>
+                
+                <div class="detail-label">Location:</div>
+                <div class="detail-value">${transaction.location}</div>
+                
+                <div class="detail-label">Employee Location:</div>
+                <div class="detail-value">${transaction.cardHolderLocation}</div>
+                
+                <div class="detail-label">Accounting Category:</div>
+                <div class="detail-value">${transaction.accountingCategory}</div>
+                
+                <div class="detail-label">Status:</div>
+                <div class="detail-value"><span class="type-badge type-${transaction.type}">${transaction.state}</span></div>
+                
+                <div class="detail-label">Type:</div>
+                <div class="detail-value"><span class="type-badge type-${transaction.type}">${transaction.type === 'expense' ? 'Reimbursement' : 'Transaction'}</span></div>
+            </div>
+        `;
+        
+        modal.classList.remove('hidden');
+    }
+    
+    closeModal() {
+        document.getElementById('transaction-modal').classList.add('hidden');
     }
 
     formatCurrency(amount) {

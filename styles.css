@@ -90,9 +90,54 @@ main {
 .filter-group select {
     padding: 0.5rem;
     border: 1px solid #d1d5db;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    background: white;
+    border-radius: 0.375rem;
+    background-color: white;
+    font-size: 0.875rem;
+}
+
+.date-input {
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background-color: white;
+    font-size: 0.875rem;
+    width: 100%;
+}
+
+.date-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.date-presets {
+    grid-column: span 2;
+}
+
+.preset-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.25rem;
+}
+
+.preset-btn {
+    padding: 0.375rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background-color: white;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.preset-btn:hover {
+    background-color: #f3f4f6;
+    border-color: #9ca3af;
+}
+
+.preset-btn:active {
+    background-color: #e5e7eb;
 }
 
 .summary-cards {
@@ -390,6 +435,14 @@ tr:hover {
         grid-template-columns: 1fr;
     }
     
+    .date-presets {
+        grid-column: span 1;
+    }
+    
+    .preset-buttons {
+        justify-content: center;
+    }
+    
     .summary-cards {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -400,5 +453,10 @@ tr:hover {
     
     .table-container {
         font-size: 0.8rem;
+    }
+    
+    .modal-content {
+        width: 95%;
+        margin: 1rem;
     }
 }

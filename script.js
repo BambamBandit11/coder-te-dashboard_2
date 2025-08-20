@@ -22,6 +22,13 @@ class TEDashboard {
         document.getElementById('month-filter').addEventListener('change', () => this.applyFilters());
         document.getElementById('merchant-filter').addEventListener('change', () => this.applyFilters());
         document.getElementById('category-filter').addEventListener('change', () => this.applyFilters());
+        document.getElementById('date-from').addEventListener('change', () => this.applyFilters());
+        document.getElementById('date-to').addEventListener('change', () => this.applyFilters());
+        
+        // Preset date range buttons
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.setDateRange(e.target.dataset.range));
+        });
         
         // Modal events
         document.getElementById('modal-close').addEventListener('click', () => this.closeModal());
@@ -212,6 +219,8 @@ class TEDashboard {
         const monthFilter = document.getElementById('month-filter').value;
         const merchantFilter = document.getElementById('merchant-filter').value;
         const categoryFilter = document.getElementById('category-filter').value;
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo = document.getElementById('date-to').value;
         
         let filtered = [...this.filteredData];
         
@@ -223,6 +232,7 @@ class TEDashboard {
             filtered = filtered.filter(t => t.employee === employeeFilter);
         }
         
+        // Apply month filter (takes precedence over date range if both are set)
         if (monthFilter !== 'all') {
             const [year, month] = monthFilter.split('-');
             filtered = filtered.filter(t => {
@@ -230,6 +240,18 @@ class TEDashboard {
                 const transactionMonth = t.date.getMonth() + 1;
                 return transactionYear === parseInt(year) && transactionMonth === parseInt(month);
             });
+        } else {
+            // Apply date range filter only if month filter is not set
+            if (dateFrom) {
+                const fromDate = new Date(dateFrom);
+                filtered = filtered.filter(t => t.date >= fromDate);
+            }
+            
+            if (dateTo) {
+                const toDate = new Date(dateTo);
+                toDate.setHours(23, 59, 59, 999); // Include the entire end date
+                filtered = filtered.filter(t => t.date <= toDate);
+            }
         }
         
         if (merchantFilter !== 'all') {
@@ -476,6 +498,52 @@ class TEDashboard {
         setTimeout(() => {
             errorElement.classList.add('hidden');
         }, 5000);
+    }
+
+    setDateRange(range) {
+        const dateFrom = document.getElementById('date-from');
+        const dateTo = document.getElementById('date-to');
+        const monthFilter = document.getElementById('month-filter');
+        
+        // Clear month filter when using date ranges
+        monthFilter.value = 'all';
+        
+        const today = new Date();
+        const formatDate = (date) => date.toISOString().split('T')[0];
+        
+        switch (range) {
+            case 'last30':
+                const thirtyDaysAgo = new Date(today);
+                thirtyDaysAgo.setDate(today.getDate() - 30);
+                dateFrom.value = formatDate(thirtyDaysAgo);
+                dateTo.value = formatDate(today);
+                break;
+                
+            case 'thisquarter':
+                const currentQuarter = Math.floor(today.getMonth() / 3);
+                const quarterStart = new Date(today.getFullYear(), currentQuarter * 3, 1);
+                const quarterEnd = new Date(today.getFullYear(), (currentQuarter + 1) * 3, 0);
+                dateFrom.value = formatDate(quarterStart);
+                dateTo.value = formatDate(quarterEnd);
+                break;
+                
+            case 'lastquarter':
+                const lastQuarter = Math.floor(today.getMonth() / 3) - 1;
+                const lastQuarterYear = lastQuarter < 0 ? today.getFullYear() - 1 : today.getFullYear();
+                const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
+                const lastQuarterStart = new Date(lastQuarterYear, adjustedQuarter * 3, 1);
+                const lastQuarterEnd = new Date(lastQuarterYear, (adjustedQuarter + 1) * 3, 0);
+                dateFrom.value = formatDate(lastQuarterStart);
+                dateTo.value = formatDate(lastQuarterEnd);
+                break;
+                
+            case 'clear':
+                dateFrom.value = '';
+                dateTo.value = '';
+                break;
+        }
+        
+        this.applyFilters();
     }
 }
 

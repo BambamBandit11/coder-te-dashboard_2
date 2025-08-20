@@ -51,6 +51,26 @@
                     <option value="all">All Categories</option>
                 </select>
             </div>
+            
+            <div class="filter-group">
+                <label for="date-from">From Date:</label>
+                <input type="date" id="date-from" class="date-input">
+            </div>
+            
+            <div class="filter-group">
+                <label for="date-to">To Date:</label>
+                <input type="date" id="date-to" class="date-input">
+            </div>
+            
+            <div class="filter-group date-presets">
+                <label>Quick Ranges:</label>
+                <div class="preset-buttons">
+                    <button type="button" class="preset-btn" data-range="last30">Last 30 Days</button>
+                    <button type="button" class="preset-btn" data-range="thisquarter">This Quarter</button>
+                    <button type="button" class="preset-btn" data-range="lastquarter">Last Quarter</button>
+                    <button type="button" class="preset-btn" data-range="clear">Clear Dates</button>
+                </div>
+            </div>
         </div>
 
         <div class="summary-cards">

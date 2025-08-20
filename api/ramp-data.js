@@ -29,20 +29,16 @@ export default async function handler(req, res) {
         // Step 1: Get access token
         const accessToken = await getAccessToken(baseUrl, clientId, clientSecret);
         
-        // Step 2: Fetch transactions and show pagination info
-        const result = await fetchTransactionsWithPaginationInfo(baseUrl, accessToken);
+        // Step 2: Fetch ALL transactions with proper pagination
+        const transactionsData = await fetchAllTransactions(baseUrl, accessToken);
 
-        // Step 3: Return combined data with debug info
+        // Step 3: Return combined data
         res.status(200).json({
-            expenses: [],
-            transactions: result.transactions,
+            expenses: [], // Skip expenses for now
+            transactions: transactionsData,
             lastUpdated: new Date().toISOString(),
             environment: environment,
-            debug: {
-                paginationInfo: result.paginationInfo,
-                totalTransactions: result.transactions.length,
-                hasMorePages: result.hasMorePages
-            }
+            totalTransactions: transactionsData.length
         });
 
     } catch (error) {
@@ -79,46 +75,47 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
     return tokenData.access_token;
 }
 
-// Fetch transactions and show pagination structure
-async function fetchTransactionsWithPaginationInfo(baseUrl, accessToken) {
-    const url = new URL(`${baseUrl}/developer/v1/transactions`);
-    url.searchParams.append('limit', '20'); // Use smaller limit to ensure we get pagination
+// Fetch ALL transactions with proper pagination
+async function fetchAllTransactions(baseUrl, accessToken) {
+    let allTransactions = [];
+    let nextUrl = `${baseUrl}/developer/v1/transactions?limit=100`;
+    let pageCount = 0;
     
-    const response = await fetch(url.toString(), {
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
+    while (nextUrl && pageCount < 20) { // Safety limit of 20 pages
+        console.log(`Fetching page ${pageCount + 1}: ${nextUrl}`);
+        
+        const response = await fetch(nextUrl, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch transactions: ${response.status} ${errorText}`);
         }
-    });
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch transactions: ${response.status} ${errorText}`);
+        const data = await response.json();
+        const transactions = data.data || [];
+        allTransactions = allTransactions.concat(transactions);
+        
+        // Get the next page URL from Ramp's response
+        nextUrl = data.page?.next || null;
+        pageCount++;
+        
+        console.log(`Page ${pageCount}: Got ${transactions.length} transactions, total: ${allTransactions.length}`);
+        
+        if (!nextUrl) {
+            console.log('No more pages available');
+            break;
+        }
     }
-
-    const data = await response.json();
-    const transactions = data.data || [];
     
-    // Extract all possible pagination info
-    const paginationInfo = {
-        page: data.page || null,
-        pagination: data.pagination || null,
-        next: data.next || null,
-        next_cursor: data.next_cursor || null,
-        has_more: data.has_more || null,
-        total: data.total || null,
-        count: data.count || null,
-        fullResponseKeys: Object.keys(data)
-    };
+    if (pageCount >= 20) {
+        console.log('Reached safety limit of 20 pages');
+    }
     
-    const hasMorePages = !!(data.page?.next || data.next_cursor || data.has_more);
-    
-    console.log('Pagination info:', JSON.stringify(paginationInfo, null, 2));
-    console.log('Has more pages:', hasMorePages);
-    
-    return {
-        transactions,
-        paginationInfo,
-        hasMorePages
-    };
+    console.log(`Final total: ${allTransactions.length} transactions`);
+    return allTransactions;
 }

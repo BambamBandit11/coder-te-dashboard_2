@@ -37,17 +37,32 @@ export default async function handler(req, res) {
         
         // Step 4: Fetch spend categories
         const spendCategoriesData = await fetchSpendCategories(baseUrl, accessToken);
+        
+        // Step 5: Fetch spend programs
+        const spendProgramsData = await fetchSpendPrograms(baseUrl, accessToken);
+        
+        // Step 6: Fetch receipts
+        const receiptsData = await fetchReceipts(baseUrl, accessToken);
+        
+        // Step 7: Fetch memos
+        const memosData = await fetchMemos(baseUrl, accessToken);
 
-        // Step 5: Return combined data
+        // Step 8: Return combined data
         res.status(200).json({
             expenses: reimbursementsData, // Now returning actual reimbursements data
             transactions: transactionsData,
             spendCategories: spendCategoriesData,
+            spendPrograms: spendProgramsData,
+            receipts: receiptsData,
+            memos: memosData,
             lastUpdated: new Date().toISOString(),
             environment: environment,
             totalTransactions: transactionsData.length,
             totalReimbursements: reimbursementsData.length,
-            totalSpendCategories: spendCategoriesData.length
+            totalSpendCategories: spendCategoriesData.length,
+            totalSpendPrograms: spendProgramsData.length,
+            totalReceipts: receiptsData.length,
+            totalMemos: memosData.length
         });
 
     } catch (error) {
@@ -71,7 +86,7 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
         },
         body: new URLSearchParams({
             'grant_type': 'client_credentials',
-            'scope': 'transactions:read reimbursements:read receipts:read users:read departments:read spend-categories:read'
+            'scope': 'accounting:read departments:read locations:read memos:read merchants:read receipt_integrations:read receipts:read reimbursements:read spend_programs:read transactions:read users:read vendors:read'
         })
     });
 
@@ -199,6 +214,93 @@ async function fetchSpendCategories(baseUrl, accessToken) {
         return categories;
     } catch (error) {
         console.warn('Error fetching spend categories:', error.message);
+        return []; // Return empty array on error
+    }
+}
+
+// Fetch spend programs
+async function fetchSpendPrograms(baseUrl, accessToken) {
+    try {
+        console.log('Fetching spend programs');
+        
+        const response = await fetch(`${baseUrl}/developer/v1/spend-programs`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(`Failed to fetch spend programs: ${response.status} ${errorText}`);
+            return []; // Return empty array if endpoint doesn't exist or fails
+        }
+
+        const data = await response.json();
+        const programs = data.data || [];
+        
+        console.log(`Got ${programs.length} spend programs`);
+        return programs;
+    } catch (error) {
+        console.warn('Error fetching spend programs:', error.message);
+        return []; // Return empty array on error
+    }
+}
+
+// Fetch receipts
+async function fetchReceipts(baseUrl, accessToken) {
+    try {
+        console.log('Fetching receipts');
+        
+        const response = await fetch(`${baseUrl}/developer/v1/receipts`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(`Failed to fetch receipts: ${response.status} ${errorText}`);
+            return []; // Return empty array if endpoint doesn't exist or fails
+        }
+
+        const data = await response.json();
+        const receipts = data.data || [];
+        
+        console.log(`Got ${receipts.length} receipts`);
+        return receipts;
+    } catch (error) {
+        console.warn('Error fetching receipts:', error.message);
+        return []; // Return empty array on error
+    }
+}
+
+// Fetch memos
+async function fetchMemos(baseUrl, accessToken) {
+    try {
+        console.log('Fetching memos');
+        
+        const response = await fetch(`${baseUrl}/developer/v1/memos`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(`Failed to fetch memos: ${response.status} ${errorText}`);
+            return []; // Return empty array if endpoint doesn't exist or fails
+        }
+
+        const data = await response.json();
+        const memos = data.data || [];
+        
+        console.log(`Got ${memos.length} memos`);
+        return memos;
+    } catch (error) {
+        console.warn('Error fetching memos:', error.message);
         return []; // Return empty array on error
     }
 }

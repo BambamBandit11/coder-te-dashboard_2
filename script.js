@@ -26,6 +26,7 @@ class TEDashboard {
         document.getElementById('date-to').addEventListener('change', () => this.applyFilters());
         document.getElementById('memo-filter').addEventListener('input', () => this.applyFilters());
         document.getElementById('spend-category-filter').addEventListener('change', () => this.applyFilters());
+        document.getElementById('spend-program-filter').addEventListener('change', () => this.applyFilters());
         
         // Preset date range buttons
         document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -73,6 +74,9 @@ class TEDashboard {
                 expenses: data.expenses || [],
                 transactions: data.transactions || [],
                 spendCategories: data.spendCategories || [],
+                spendPrograms: data.spendPrograms || [],
+                receipts: data.receipts || [],
+                memos: data.memos || [],
                 lastUpdated: new Date().toISOString()
             };
             
@@ -128,7 +132,8 @@ class TEDashboard {
                 state: expense.state || 'Unknown',
                 cardHolderLocation: 'N/A', // Reimbursements don't have card holder location
                 memo: expense.memo || 'No memo',
-                spendCategory: 'Reimbursement' // Reimbursements don't have spend categories
+                spendCategory: 'Reimbursement', // Reimbursements don't have spend categories
+                spendProgram: this.getSpendProgramName(expense.spend_program_id) || 'No Program'
             });
         });
         
@@ -161,7 +166,8 @@ class TEDashboard {
                 state: transaction.state || 'Unknown',
                 cardHolderLocation: transaction.card_holder?.location_name || 'Unknown',
                 memo: transaction.memo || 'No memo',
-                spendCategory: transaction.sk_category_name || 'Uncategorized'
+                spendCategory: transaction.sk_category_name || 'Uncategorized',
+                spendProgram: this.getSpendProgramName(transaction.spend_program_id) || 'No Program'
             });
         });
         
@@ -187,6 +193,10 @@ class TEDashboard {
         // Populate spend categories from API data
         const spendCategories = this.data.spendCategories.map(cat => cat.name || cat.display_name || 'Unknown').sort();
         this.populateSelect('spend-category-filter', spendCategories);
+        
+        // Populate spend programs from API data
+        const spendPrograms = this.data.spendPrograms.map(prog => prog.name || prog.display_name || 'Unknown').sort();
+        this.populateSelect('spend-program-filter', spendPrograms);
     }
 
     populateSelect(selectId, options) {
@@ -239,6 +249,7 @@ class TEDashboard {
         const dateTo = document.getElementById('date-to').value;
         const memoFilter = document.getElementById('memo-filter').value.toLowerCase().trim();
         const spendCategoryFilter = document.getElementById('spend-category-filter').value;
+        const spendProgramFilter = document.getElementById('spend-program-filter').value;
         
         let filtered = [...this.filteredData];
         
@@ -288,6 +299,10 @@ class TEDashboard {
             filtered = filtered.filter(t => t.spendCategory === spendCategoryFilter);
         }
         
+        if (spendProgramFilter !== 'all') {
+            filtered = filtered.filter(t => t.spendProgram === spendProgramFilter);
+        }
+        
         this.updateSummary(filtered);
         this.updateDepartmentChart(filtered);
         this.updateMonthlyChart(filtered);
@@ -311,10 +326,14 @@ class TEDashboard {
         // Calculate reimbursement count
         const reimbursementCount = data.filter(t => t.type === 'expense').length;
         
+        // Calculate receipts count from API data
+        const receiptCount = this.data.receipts ? this.data.receipts.length : 0;
+        
         document.getElementById('total-spend').textContent = this.formatCurrency(ytdTotal);
         document.getElementById('month-spend').textContent = this.formatCurrency(monthTotal);
         document.getElementById('transaction-count').textContent = data.length.toLocaleString();
         document.getElementById('reimbursement-count').textContent = reimbursementCount.toLocaleString();
+        document.getElementById('receipt-count').textContent = receiptCount.toLocaleString();
     }
 
     updateDepartmentChart(data) {
@@ -481,6 +500,9 @@ class TEDashboard {
                 
                 <div class="detail-label">Spend Category:</div>
                 <div class="detail-value">${transaction.spendCategory}</div>
+                
+                <div class="detail-label">Spend Program:</div>
+                <div class="detail-value">${transaction.spendProgram}</div>
             </div>
         `;
         
@@ -576,6 +598,12 @@ class TEDashboard {
         }
         
         this.applyFilters();
+    }
+    
+    getSpendProgramName(spendProgramId) {
+        if (!spendProgramId || !this.data.spendPrograms) return null;
+        const program = this.data.spendPrograms.find(p => p.id === spendProgramId);
+        return program ? (program.name || program.display_name) : null;
     }
 }
 

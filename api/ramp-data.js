@@ -34,15 +34,20 @@ export default async function handler(req, res) {
         
         // Step 3: Fetch ALL reimbursements with proper pagination
         const reimbursementsData = await fetchAllReimbursements(baseUrl, accessToken);
+        
+        // Step 4: Fetch spend categories
+        const spendCategoriesData = await fetchSpendCategories(baseUrl, accessToken);
 
-        // Step 4: Return combined data
+        // Step 5: Return combined data
         res.status(200).json({
             expenses: reimbursementsData, // Now returning actual reimbursements data
             transactions: transactionsData,
+            spendCategories: spendCategoriesData,
             lastUpdated: new Date().toISOString(),
             environment: environment,
             totalTransactions: transactionsData.length,
-            totalReimbursements: reimbursementsData.length
+            totalReimbursements: reimbursementsData.length,
+            totalSpendCategories: spendCategoriesData.length
         });
 
     } catch (error) {
@@ -66,7 +71,7 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
         },
         body: new URLSearchParams({
             'grant_type': 'client_credentials',
-            'scope': 'transactions:read reimbursements:read receipts:read users:read departments:read'
+            'scope': 'transactions:read reimbursements:read receipts:read users:read departments:read spend-categories:read'
         })
     });
 
@@ -167,4 +172,33 @@ async function fetchAllReimbursements(baseUrl, accessToken) {
     
     console.log(`Final reimbursements total: ${allReimbursements.length} reimbursements`);
     return allReimbursements;
+}
+
+// Fetch spend categories
+async function fetchSpendCategories(baseUrl, accessToken) {
+    try {
+        console.log('Fetching spend categories');
+        
+        const response = await fetch(`${baseUrl}/developer/v1/spend-categories`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(`Failed to fetch spend categories: ${response.status} ${errorText}`);
+            return []; // Return empty array if endpoint doesn't exist or fails
+        }
+
+        const data = await response.json();
+        const categories = data.data || [];
+        
+        console.log(`Got ${categories.length} spend categories`);
+        return categories;
+    } catch (error) {
+        console.warn('Error fetching spend categories:', error.message);
+        return []; // Return empty array on error
+    }
 }

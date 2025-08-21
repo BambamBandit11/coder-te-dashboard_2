@@ -24,6 +24,7 @@ class TEDashboard {
         document.getElementById('category-filter').addEventListener('change', () => this.applyFilters());
         document.getElementById('date-from').addEventListener('change', () => this.applyFilters());
         document.getElementById('date-to').addEventListener('change', () => this.applyFilters());
+        document.getElementById('memo-filter').addEventListener('input', () => this.applyFilters());
         
         // Preset date range buttons
         document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -97,28 +98,34 @@ class TEDashboard {
         // Process expenses
         this.data.expenses.forEach(expense => {
             // Extract accounting category (GL Account) for expenses
-            const glAccount = expense.accounting_categories?.find(cat => 
-                cat.tracking_category_remote_type === 'GL_ACCOUNT'
+            // Reimbursements use accounting_field_selections instead of accounting_categories
+            const glAccount = expense.accounting_field_selections?.find(cat => 
+                cat.type === 'GL_ACCOUNT'
+            ) || expense.line_items?.[0]?.accounting_field_selections?.find(cat => 
+                cat.type === 'GL_ACCOUNT'
             );
             
-            // Extract location information
-            const location = expense.location?.name || expense.user?.location_name || 'Unknown';
+            // Extract location information - reimbursements have different structure
+            const location = expense.start_location || expense.end_location || 'Unknown';
             
             allTransactions.push({
                 id: expense.id,
-                date: new Date(expense.created_time || expense.user_transaction_time),
-                amount: expense.amount / 100, // Convert cents to dollars
-                currency: expense.currency_code || 'USD',
-                employee: expense.user ? `${expense.user.first_name} ${expense.user.last_name}` : 'Unknown',
-                department: expense.user?.department_name || 'Unknown',
-                merchant: expense.merchant?.name || expense.merchant_name || 'Unknown',
+                date: new Date(expense.transaction_date || expense.created_at),
+                amount: expense.amount, // Reimbursements are already in dollars
+                currency: expense.currency || 'USD',
+                employee: expense.user_full_name || 'Unknown',
+                department: expense.line_items?.[0]?.accounting_field_selections?.find(cat => 
+                    cat.type === 'OTHER' && cat.category_info?.name === 'Department'
+                )?.name || 'Unknown',
+                merchant: expense.merchant || 'Unknown',
                 location: location,
                 type: 'expense',
                 // Enhanced fields
-                accountingCategory: glAccount?.category_name || 'Uncategorized',
-                merchantDescriptor: expense.merchant?.name || expense.merchant_name || 'Unknown',
+                accountingCategory: glAccount?.name || 'Uncategorized',
+                merchantDescriptor: expense.merchant || 'Unknown',
                 state: expense.state || 'Unknown',
-                cardHolderLocation: expense.user?.location_name || 'Unknown'
+                cardHolderLocation: 'N/A', // Reimbursements don't have card holder location
+                memo: expense.memo || 'No memo'
             });
         });
         
@@ -149,7 +156,8 @@ class TEDashboard {
                 accountingCategory: glAccount?.category_name || 'Uncategorized',
                 merchantDescriptor: transaction.merchant_descriptor || transaction.merchant_name || 'Unknown',
                 state: transaction.state || 'Unknown',
-                cardHolderLocation: transaction.card_holder?.location_name || 'Unknown'
+                cardHolderLocation: transaction.card_holder?.location_name || 'Unknown',
+                memo: transaction.memo || 'No memo'
             });
         });
         
@@ -221,6 +229,7 @@ class TEDashboard {
         const categoryFilter = document.getElementById('category-filter').value;
         const dateFrom = document.getElementById('date-from').value;
         const dateTo = document.getElementById('date-to').value;
+        const memoFilter = document.getElementById('memo-filter').value.toLowerCase().trim();
         
         let filtered = [...this.filteredData];
         
@@ -260,6 +269,10 @@ class TEDashboard {
         
         if (categoryFilter !== 'all') {
             filtered = filtered.filter(t => t.accountingCategory === categoryFilter);
+        }
+        
+        if (memoFilter) {
+            filtered = filtered.filter(t => t.memo.toLowerCase().includes(memoFilter));
         }
         
         this.updateSummary(filtered);
@@ -449,6 +462,9 @@ class TEDashboard {
                 
                 <div class="detail-label">Type:</div>
                 <div class="detail-value"><span class="type-badge type-${transaction.type}">${transaction.type === 'expense' ? 'Reimbursement' : 'Transaction'}</span></div>
+                
+                <div class="detail-label">Memo:</div>
+                <div class="detail-value">${transaction.memo}</div>
             </div>
         `;
         

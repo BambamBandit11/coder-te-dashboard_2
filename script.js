@@ -25,6 +25,7 @@ class TEDashboard {
         document.getElementById('date-from').addEventListener('change', () => this.applyFilters());
         document.getElementById('date-to').addEventListener('change', () => this.applyFilters());
         document.getElementById('memo-filter').addEventListener('input', () => this.applyFilters());
+        document.getElementById('spend-category-filter').addEventListener('change', () => this.applyFilters());
         
         // Preset date range buttons
         document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -71,6 +72,7 @@ class TEDashboard {
             this.data = {
                 expenses: data.expenses || [],
                 transactions: data.transactions || [],
+                spendCategories: data.spendCategories || [],
                 lastUpdated: new Date().toISOString()
             };
             
@@ -125,7 +127,8 @@ class TEDashboard {
                 merchantDescriptor: expense.merchant || 'Unknown',
                 state: expense.state || 'Unknown',
                 cardHolderLocation: 'N/A', // Reimbursements don't have card holder location
-                memo: expense.memo || 'No memo'
+                memo: expense.memo || 'No memo',
+                spendCategory: 'Reimbursement' // Reimbursements don't have spend categories
             });
         });
         
@@ -157,7 +160,8 @@ class TEDashboard {
                 merchantDescriptor: transaction.merchant_descriptor || transaction.merchant_name || 'Unknown',
                 state: transaction.state || 'Unknown',
                 cardHolderLocation: transaction.card_holder?.location_name || 'Unknown',
-                memo: transaction.memo || 'No memo'
+                memo: transaction.memo || 'No memo',
+                spendCategory: transaction.sk_category_name || 'Uncategorized'
             });
         });
         
@@ -179,6 +183,10 @@ class TEDashboard {
         this.populateSelect('employee-filter', employees);
         this.populateSelect('merchant-filter', merchants);
         this.populateSelect('category-filter', categories);
+        
+        // Populate spend categories from API data
+        const spendCategories = this.data.spendCategories.map(cat => cat.name || cat.display_name || 'Unknown').sort();
+        this.populateSelect('spend-category-filter', spendCategories);
     }
 
     populateSelect(selectId, options) {
@@ -230,6 +238,7 @@ class TEDashboard {
         const dateFrom = document.getElementById('date-from').value;
         const dateTo = document.getElementById('date-to').value;
         const memoFilter = document.getElementById('memo-filter').value.toLowerCase().trim();
+        const spendCategoryFilter = document.getElementById('spend-category-filter').value;
         
         let filtered = [...this.filteredData];
         
@@ -273,6 +282,10 @@ class TEDashboard {
         
         if (memoFilter) {
             filtered = filtered.filter(t => t.memo.toLowerCase().includes(memoFilter));
+        }
+        
+        if (spendCategoryFilter !== 'all') {
+            filtered = filtered.filter(t => t.spendCategory === spendCategoryFilter);
         }
         
         this.updateSummary(filtered);
@@ -465,6 +478,9 @@ class TEDashboard {
                 
                 <div class="detail-label">Memo:</div>
                 <div class="detail-value">${transaction.memo}</div>
+                
+                <div class="detail-label">Spend Category:</div>
+                <div class="detail-value">${transaction.spendCategory}</div>
             </div>
         `;
         

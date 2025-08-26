@@ -506,101 +506,118 @@ export default function Dashboard() {
           )}
           
           <div className="filters">
-            <MultiSelectFilter 
-              label="Department" 
-              filterName="department" 
-              options={getUniqueValues('department')} 
-              selectedValues={filters.department}
-            />
-            
-            <MultiSelectFilter 
-              label="Employee" 
-              filterName="employee" 
-              options={getUniqueValues('employee')} 
-              selectedValues={filters.employee}
-            />
-            
-            <div className="filter-group">
-              <label>Month:</label>
-              <select value={filters.month} onChange={(e) => handleFilterChange('month', e.target.value)}>
-                <option value="all">All Months (YTD)</option>
-                {Array.from({length: 12}, (_, i) => {
-                  const month = String(i + 1).padStart(2, '0');
-                  const monthName = new Date(2025, i, 1).toLocaleString('default', { month: 'long' });
-                  return (
-                    <option key={month} value={`2025-${month}`}>{monthName} 2025</option>
-                  );
-                })}
-              </select>
-            </div>
-            
-            <MultiSelectFilter 
-              label="Merchant" 
-              filterName="merchant" 
-              options={getUniqueValues('merchant')} 
-              selectedValues={filters.merchant}
-            />
-            
-            <MultiSelectFilter 
-              label="Category" 
-              filterName="category" 
-              options={getUniqueValues('accountingCategory')} 
-              selectedValues={filters.category}
-            />
-            
-            <div className="filter-group">
-              <label>Memo Search:</label>
-              <input 
-                type="text" 
-                className="text-input" 
-                placeholder="Search memos..."
-                value={filters.memo}
-                onChange={(e) => handleFilterChange('memo', e.target.value)}
-              />
-            </div>
-            
-            <MultiSelectFilter 
-              label="Spend Program" 
-              filterName="spendProgram" 
-              options={Array.isArray(data.spendPrograms) ? data.spendPrograms.map(prog => prog.name || prog.display_name || 'Unknown').filter(Boolean) : []}
-              selectedValues={filters.spendProgram}
-            />
-            
-            <div className="filter-group">
-              <label>From Date:</label>
-              <input 
-                type="date" 
-                className="date-input"
-                value={filters.dateFrom}
-                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-              />
-            </div>
-            
-            <div className="filter-group">
-              <label>To Date:</label>
-              <input 
-                type="date" 
-                className="date-input"
-                value={filters.dateTo}
-                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-              />
-            </div>
-            
-            <div className="filter-group date-presets">
-              <label>Quick Ranges:</label>
-              <div className="preset-buttons">
-                <button type="button" className="preset-btn" onClick={() => setDateRange('last30')}>Last 30 Days</button>
-                <button type="button" className="preset-btn" onClick={() => setDateRange('thisquarter')}>This Quarter</button>
-                <button type="button" className="preset-btn" onClick={() => setDateRange('lastquarter')}>Last Quarter</button>
-                <button type="button" className="preset-btn" onClick={() => setDateRange('clear')}>Clear Dates</button>
+            <div className="filter-section">
+              <h3 className="filter-section-title">Basic Filters</h3>
+              <div className="filter-row">
+                <MultiSelectFilter 
+                  label="Department" 
+                  filterName="department" 
+                  options={getUniqueValues('department')} 
+                  selectedValues={filters.department}
+                />
+                
+                <MultiSelectFilter 
+                  label="Employee" 
+                  filterName="employee" 
+                  options={getUniqueValues('employee')} 
+                  selectedValues={filters.employee}
+                />
+                
+                <div className="filter-group">
+                  <label>Month:</label>
+                  <select value={filters.month} onChange={(e) => handleFilterChange('month', e.target.value)}>
+                    <option value="all">All Months (YTD)</option>
+                    {Array.from({length: 12}, (_, i) => {
+                      const month = String(i + 1).padStart(2, '0');
+                      const monthName = new Date(2025, i, 1).toLocaleString('default', { month: 'long' });
+                      return (
+                        <option key={month} value={`2025-${month}`}>{monthName} 2025</option>
+                      );
+                    })}
+                  </select>
+                </div>
               </div>
             </div>
             
-            <div className="filter-group clear-all">
-              <label>&nbsp;</label>
-              <button type="button" className="clear-all-btn" onClick={clearAllFilters}>
-                Clear All Filters
-              </button>
+            <div className="filter-section">
+              <h3 className="filter-section-title">Transaction Details</h3>
+              <div className="filter-row">
+                <MultiSelectFilter 
+                  label="Merchant" 
+                  filterName="merchant" 
+                  options={getUniqueValues('merchant')} 
+                  selectedValues={filters.merchant}
+                />
+                
+                <MultiSelectFilter 
+                  label="Category" 
+                  filterName="category" 
+                  options={getUniqueValues('accountingCategory')} 
+                  selectedValues={filters.category}
+                />
+                
+                <MultiSelectFilter 
+                  label="Spend Program" 
+                  filterName="spendProgram" 
+                  options={Array.isArray(data.spendPrograms) ? data.spendPrograms.map(prog => prog.name || prog.display_name || 'Unknown').filter(Boolean) : []}
+                  selectedValues={filters.spendProgram}
+                />
+              </div>
+            </div>
+            
+            <div className="filter-section">
+              <h3 className="filter-section-title">Search & Date Range</h3>
+              <div className="filter-row">
+                <div className="filter-group">
+                  <label>Memo Search:</label>
+                  <input 
+                    type="text" 
+                    className="text-input" 
+                    placeholder="Search memos..."
+                    value={filters.memo}
+                    onChange={(e) => handleFilterChange('memo', e.target.value)}
+                  />
+                </div>
+                
+                <div className="filter-group">
+                  <label>From Date:</label>
+                  <input 
+                    type="date" 
+                    className="date-input"
+                    value={filters.dateFrom}
+                    onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                  />
+                </div>
+                
+                <div className="filter-group">
+                  <label>To Date:</label>
+                  <input 
+                    type="date" 
+                    className="date-input"
+                    value={filters.dateTo}
+                    onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              <div className="filter-row">
+                <div className="filter-group date-presets">
+                  <label>Quick Ranges:</label>
+                  <div className="preset-buttons">
+                    <button type="button" className="preset-btn" onClick={() => setDateRange('last30')}>Last 30 Days</button>
+                    <button type="button" className="preset-btn" onClick={() => setDateRange('thisquarter')}>This Quarter</button>
+                    <button type="button" className="preset-btn" onClick={() => setDateRange('lastquarter')}>Last Quarter</button>
+                    <button type="button" className="preset-btn" onClick={() => setDateRange('clear')}>Clear Dates</button>
+                  </div>
+                </div>
+                
+                <div className="filter-group clear-all">
+                  <label>&nbsp;</label>
+                  <button type="button" className="clear-all-btn" onClick={clearAllFilters}>
+                    Clear All Filters
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -659,7 +676,14 @@ export default function Dashboard() {
                       <td className="receipt-status" style={{position: 'relative'}}>
                         <span 
                           className={transaction.hasReceipt && transaction.receiptUrl ? 'receipt-with-image' : ''}
-                          title={transaction.hasReceipt && transaction.receiptUrl ? 'Hover to see receipt' : (transaction.hasReceipt ? 'Has Receipt' : 'No Receipt')}
+                          title={transaction.hasReceipt && transaction.receiptUrl ? 'Hover to preview, click to open full size' : (transaction.hasReceipt ? 'Has Receipt' : 'No Receipt')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (transaction.hasReceipt && transaction.receiptUrl) {
+                              window.open(transaction.receiptUrl, '_blank', 'width=800,height=1000,scrollbars=yes,resizable=yes');
+                            }
+                          }}
+                          style={{cursor: transaction.hasReceipt && transaction.receiptUrl ? 'pointer' : 'default'}}
                         >
                           {transaction.hasReceipt ? '✅' : '❌'}
                         </span>
@@ -816,9 +840,34 @@ export default function Dashboard() {
           border-radius: 8px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           margin-bottom: 2rem;
+        }
+        
+        .filter-section {
+          margin-bottom: 1.5rem;
+        }
+        
+        .filter-section:last-child {
+          margin-bottom: 0;
+        }
+        
+        .filter-section-title {
+          font-size: 1rem;
+          font-weight: 600;
+          color: #374151;
+          margin: 0 0 1rem 0;
+          padding-bottom: 0.5rem;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .filter-row {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
           gap: 1rem;
+          margin-bottom: 1rem;
+        }
+        
+        .filter-row:last-child {
+          margin-bottom: 0;
         }
         
         .filter-group {
@@ -1089,11 +1138,11 @@ export default function Dashboard() {
         }
         
         .clear-all {
-          grid-column: span 2;
+          display: flex;
+          align-items: end;
         }
         
         .clear-all-btn {
-          width: 100%;
           padding: 0.75rem 1.5rem;
           background: #dc2626;
           color: white;
@@ -1102,6 +1151,7 @@ export default function Dashboard() {
           font-weight: 500;
           cursor: pointer;
           transition: background 0.2s;
+          white-space: nowrap;
         }
         
         .clear-all-btn:hover {

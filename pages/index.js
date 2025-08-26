@@ -34,16 +34,35 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    applyFilters();
+    if (data.expenses.length > 0 || data.transactions.length > 0) {
+      applyFilters();
+    }
   }, [data, filters]);
 
   const loadData = async () => {
     try {
-      const cachedData = localStorage.getItem('te-dashboard-data');
-      if (cachedData) {
-        const parsed = JSON.parse(cachedData);
-        setData(parsed);
+      // Try to load cached data first
+      if (typeof window !== 'undefined') {
+        const cachedData = localStorage.getItem('te-dashboard-data');
+        if (cachedData) {
+          try {
+            const parsed = JSON.parse(cachedData);
+            setData({
+              expenses: parsed.expenses || [],
+              transactions: parsed.transactions || [],
+              spendCategories: parsed.spendCategories || [],
+              spendPrograms: parsed.spendPrograms || [],
+              receipts: parsed.receipts || [],
+              memos: parsed.memos || [],
+              lastUpdated: parsed.lastUpdated
+            });
+          } catch (parseError) {
+            console.warn('Failed to parse cached data:', parseError);
+          }
+        }
       }
+      
+      // Fetch fresh data
       await fetchData();
     } catch (error) {
       console.error('Error loading data:', error);
@@ -53,6 +72,7 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     setLoading(true);
+    setError('');
     try {
       const response = await fetch('/api/ramp-data');
       if (!response.ok) {
@@ -61,17 +81,25 @@ export default function Dashboard() {
       const fetchedData = await response.json();
       
       const newData = {
-        expenses: fetchedData.expenses || [],
-        transactions: fetchedData.transactions || [],
-        spendCategories: fetchedData.spendCategories || [],
-        spendPrograms: fetchedData.spendPrograms || [],
-        receipts: fetchedData.receipts || [],
-        memos: fetchedData.memos || [],
+        expenses: Array.isArray(fetchedData.expenses) ? fetchedData.expenses : [],
+        transactions: Array.isArray(fetchedData.transactions) ? fetchedData.transactions : [],
+        spendCategories: Array.isArray(fetchedData.spendCategories) ? fetchedData.spendCategories : [],
+        spendPrograms: Array.isArray(fetchedData.spendPrograms) ? fetchedData.spendPrograms : [],
+        receipts: Array.isArray(fetchedData.receipts) ? fetchedData.receipts : [],
+        memos: Array.isArray(fetchedData.memos) ? fetchedData.memos : [],
         lastUpdated: new Date().toISOString()
       };
       
       setData(newData);
-      localStorage.setItem('te-dashboard-data', JSON.stringify(newData));
+      
+      // Cache the data
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('te-dashboard-data', JSON.stringify(newData));
+        } catch (storageError) {
+          console.warn('Failed to cache data:', storageError);
+        }
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       setError('Failed to fetch fresh data. Showing cached data if available.');
@@ -81,134 +109,184 @@ export default function Dashboard() {
   };
 
   const getSpendProgramName = (spendProgramId) => {
-    if (!spendProgramId || !data.spendPrograms) return null;
-    const program = data.spendPrograms.find(p => p.id === spendProgramId);
-    return program ? (program.name || program.display_name) : null;
+    if (!spendProgramId || !Array.isArray(data.spendPrograms)) return 'No Program';
+    const program = data.spendPrograms.find(p => p && p.id === spendProgramId);
+    return program ? (program.name || program.display_name || 'Unknown Program') : 'No Program';
   };
 
   const processData = () => {
     const allTransactions = [];
     
-    // Process expenses (reimbursements)
-    data.expenses.forEach(expense => {
-      const glAccount = expense.accounting_field_selections?.find(cat => 
-        cat.type === 'GL_ACCOUNT'
-      ) || expense.line_items?.[0]?.accounting_field_selections?.find(cat => 
-        cat.type === 'GL_ACCOUNT'
-      );
+    try {
+      // Process expenses (reimbursements)
+      if (Array.isArray(data.expenses)) {
+        data.expenses.forEach(expense => {
+          if (!expense) return;
+          
+          try {
+            const glAccount = expense.accounting_field_selections?.find(cat => 
+              cat && cat.type === 'GL_ACCOUNT'
+            ) || expense.line_items?.[0]?.accounting_field_selections?.find(cat => 
+              cat && cat.type === 'GL_ACCOUNT'
+            );
+            
+            const location = expense.start_location || expense.end_location || 'Unknown';
+            
+            allTransactions.push({
+              id: expense.id || `expense-${Math.random()}`,
+              date: new Date(expense.transaction_date || expense.created_at || Date.now()),
+              amount: typeof expense.amount === 'number' ? expense.amount : 0,
+              currency: expense.currency || 'USD',
+              employee: expense.user_full_name || 'Unknown',
+              department: expense.line_items?.[0]?.accounting_field_selections?.find(cat => 
+                cat && cat.type === 'OTHER' && cat.category_info?.name === 'Department'
+              )?.name || 'Unknown',
+              merchant: expense.merchant || 'Unknown',
+              location: location,
+              type: 'expense',
+              accountingCategory: glAccount?.name || 'Uncategorized',
+              merchantDescriptor: expense.merchant || 'Unknown',
+              state: expense.state || 'Unknown',
+              cardHolderLocation: 'N/A',
+              memo: expense.memo || 'No memo',
+              spendCategory: 'Reimbursement',
+              spendProgram: getSpendProgramName(expense.spend_program_id)
+            });
+          } catch (expenseError) {
+            console.warn('Error processing expense:', expenseError, expense);
+          }
+        });
+      }
       
-      const location = expense.start_location || expense.end_location || 'Unknown';
-      
-      allTransactions.push({
-        id: expense.id,
-        date: new Date(expense.transaction_date || expense.created_at),
-        amount: expense.amount,
-        currency: expense.currency || 'USD',
-        employee: expense.user_full_name || 'Unknown',
-        department: expense.line_items?.[0]?.accounting_field_selections?.find(cat => 
-          cat.type === 'OTHER' && cat.category_info?.name === 'Department'
-        )?.name || 'Unknown',
-        merchant: expense.merchant || 'Unknown',
-        location: location,
-        type: 'expense',
-        accountingCategory: glAccount?.name || 'Uncategorized',
-        merchantDescriptor: expense.merchant || 'Unknown',
-        state: expense.state || 'Unknown',
-        cardHolderLocation: 'N/A',
-        memo: expense.memo || 'No memo',
-        spendCategory: 'Reimbursement',
-        spendProgram: getSpendProgramName(expense.spend_program_id) || 'No Program'
-      });
+      // Process transactions
+      if (Array.isArray(data.transactions)) {
+        data.transactions.forEach(transaction => {
+          if (!transaction) return;
+          
+          try {
+            const glAccount = transaction.accounting_categories?.find(cat => 
+              cat && cat.tracking_category_remote_type === 'GL_ACCOUNT'
+            );
+            
+            const merchantLocation = transaction.merchant_location;
+            const locationString = merchantLocation ? 
+              [merchantLocation.city, merchantLocation.state, merchantLocation.country]
+                .filter(Boolean).join(', ') || 'Unknown' : 'Unknown';
+            
+            allTransactions.push({
+              id: transaction.id || `transaction-${Math.random()}`,
+              date: new Date(transaction.user_transaction_time || Date.now()),
+              amount: typeof transaction.amount === 'number' ? transaction.amount / 100 : 0,
+              currency: transaction.currency_code || 'USD',
+              employee: transaction.card_holder ? 
+                `${transaction.card_holder.first_name || ''} ${transaction.card_holder.last_name || ''}`.trim() || 'Unknown' : 'Unknown',
+              department: transaction.card_holder?.department_name || 'Unknown',
+              merchant: transaction.merchant_name || 'Unknown',
+              location: locationString,
+              type: 'transaction',
+              accountingCategory: glAccount?.category_name || 'Uncategorized',
+              merchantDescriptor: transaction.merchant_descriptor || transaction.merchant_name || 'Unknown',
+              state: transaction.state || 'Unknown',
+              cardHolderLocation: transaction.card_holder?.location_name || 'Unknown',
+              memo: transaction.memo || 'No memo',
+              spendCategory: transaction.sk_category_name || 'Uncategorized',
+              spendProgram: getSpendProgramName(transaction.spend_program_id)
+            });
+          } catch (transactionError) {
+            console.warn('Error processing transaction:', transactionError, transaction);
+          }
+        });
+      }
+    } catch (processError) {
+      console.error('Error in processData:', processError);
+    }
+    
+    // Sort by date (newest first)
+    allTransactions.sort((a, b) => {
+      try {
+        return b.date.getTime() - a.date.getTime();
+      } catch (sortError) {
+        return 0;
+      }
     });
     
-    // Process transactions
-    data.transactions.forEach(transaction => {
-      const glAccount = transaction.accounting_categories?.find(cat => 
-        cat.tracking_category_remote_type === 'GL_ACCOUNT'
-      );
-      
-      const merchantLocation = transaction.merchant_location;
-      const locationString = [merchantLocation?.city, merchantLocation?.state, merchantLocation?.country]
-        .filter(Boolean).join(', ') || 'Unknown';
-      
-      allTransactions.push({
-        id: transaction.id,
-        date: new Date(transaction.user_transaction_time),
-        amount: transaction.amount / 100,
-        currency: transaction.currency_code || 'USD',
-        employee: transaction.card_holder ? 
-          `${transaction.card_holder.first_name} ${transaction.card_holder.last_name}` : 'Unknown',
-        department: transaction.card_holder?.department_name || 'Unknown',
-        merchant: transaction.merchant_name || 'Unknown',
-        location: locationString,
-        type: 'transaction',
-        accountingCategory: glAccount?.category_name || 'Uncategorized',
-        merchantDescriptor: transaction.merchant_descriptor || transaction.merchant_name || 'Unknown',
-        state: transaction.state || 'Unknown',
-        cardHolderLocation: transaction.card_holder?.location_name || 'Unknown',
-        memo: transaction.memo || 'No memo',
-        spendCategory: transaction.sk_category_name || 'Uncategorized',
-        spendProgram: getSpendProgramName(transaction.spend_program_id) || 'No Program'
-      });
-    });
-    
-    allTransactions.sort((a, b) => b.date - a.date);
     return allTransactions;
   };
 
   const applyFilters = () => {
-    const processed = processData();
-    let filtered = [...processed];
-    
-    if (filters.department !== 'all') {
-      filtered = filtered.filter(t => t.department === filters.department);
-    }
-    
-    if (filters.employee !== 'all') {
-      filtered = filtered.filter(t => t.employee === filters.employee);
-    }
-    
-    if (filters.month !== 'all') {
-      const [year, month] = filters.month.split('-');
-      filtered = filtered.filter(t => {
-        const transactionYear = t.date.getFullYear();
-        const transactionMonth = t.date.getMonth() + 1;
-        return transactionYear === parseInt(year) && transactionMonth === parseInt(month);
-      });
-    } else {
-      if (filters.dateFrom) {
-        const fromDate = new Date(filters.dateFrom);
-        filtered = filtered.filter(t => t.date >= fromDate);
+    try {
+      const processed = processData();
+      let filtered = [...processed];
+      
+      if (filters.department !== 'all') {
+        filtered = filtered.filter(t => t && t.department === filters.department);
       }
       
-      if (filters.dateTo) {
-        const toDate = new Date(filters.dateTo);
-        toDate.setHours(23, 59, 59, 999);
-        filtered = filtered.filter(t => t.date <= toDate);
+      if (filters.employee !== 'all') {
+        filtered = filtered.filter(t => t && t.employee === filters.employee);
       }
+      
+      if (filters.month !== 'all') {
+        const [year, month] = filters.month.split('-');
+        if (year && month) {
+          filtered = filtered.filter(t => {
+            if (!t || !t.date) return false;
+            try {
+              const transactionYear = t.date.getFullYear();
+              const transactionMonth = t.date.getMonth() + 1;
+              return transactionYear === parseInt(year) && transactionMonth === parseInt(month);
+            } catch (dateError) {
+              return false;
+            }
+          });
+        }
+      } else {
+        if (filters.dateFrom) {
+          try {
+            const fromDate = new Date(filters.dateFrom);
+            filtered = filtered.filter(t => t && t.date && t.date >= fromDate);
+          } catch (dateError) {
+            console.warn('Invalid from date:', filters.dateFrom);
+          }
+        }
+        
+        if (filters.dateTo) {
+          try {
+            const toDate = new Date(filters.dateTo);
+            toDate.setHours(23, 59, 59, 999);
+            filtered = filtered.filter(t => t && t.date && t.date <= toDate);
+          } catch (dateError) {
+            console.warn('Invalid to date:', filters.dateTo);
+          }
+        }
+      }
+      
+      if (filters.merchant !== 'all') {
+        filtered = filtered.filter(t => t && t.merchant === filters.merchant);
+      }
+      
+      if (filters.category !== 'all') {
+        filtered = filtered.filter(t => t && t.accountingCategory === filters.category);
+      }
+      
+      if (filters.memo && filters.memo.trim()) {
+        const memoLower = filters.memo.toLowerCase().trim();
+        filtered = filtered.filter(t => t && t.memo && t.memo.toLowerCase().includes(memoLower));
+      }
+      
+      if (filters.spendCategory !== 'all') {
+        filtered = filtered.filter(t => t && t.spendCategory === filters.spendCategory);
+      }
+      
+      if (filters.spendProgram !== 'all') {
+        filtered = filtered.filter(t => t && t.spendProgram === filters.spendProgram);
+      }
+      
+      setFilteredData(filtered);
+    } catch (filterError) {
+      console.error('Error in applyFilters:', filterError);
+      setFilteredData([]);
     }
-    
-    if (filters.merchant !== 'all') {
-      filtered = filtered.filter(t => t.merchant === filters.merchant);
-    }
-    
-    if (filters.category !== 'all') {
-      filtered = filtered.filter(t => t.accountingCategory === filters.category);
-    }
-    
-    if (filters.memo) {
-      filtered = filtered.filter(t => t.memo.toLowerCase().includes(filters.memo.toLowerCase()));
-    }
-    
-    if (filters.spendCategory !== 'all') {
-      filtered = filtered.filter(t => t.spendCategory === filters.spendCategory);
-    }
-    
-    if (filters.spendProgram !== 'all') {
-      filtered = filtered.filter(t => t.spendProgram === filters.spendProgram);
-    }
-    
-    setFilteredData(filtered);
   };
 
   const handleFilterChange = (filterName, value) => {
@@ -216,46 +294,52 @@ export default function Dashboard() {
   };
 
   const setDateRange = (range) => {
-    const today = new Date();
-    const formatDate = (date) => date.toISOString().split('T')[0];
-    
-    let newFilters = { ...filters, month: 'all' };
-    
-    switch (range) {
-      case 'last30':
-        const thirtyDaysAgo = new Date(today);
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        newFilters.dateFrom = formatDate(thirtyDaysAgo);
-        newFilters.dateTo = formatDate(today);
-        break;
-      case 'thisquarter':
-        const currentQuarter = Math.floor(today.getMonth() / 3);
-        const quarterStart = new Date(today.getFullYear(), currentQuarter * 3, 1);
-        const quarterEnd = new Date(today.getFullYear(), (currentQuarter + 1) * 3, 0);
-        newFilters.dateFrom = formatDate(quarterStart);
-        newFilters.dateTo = formatDate(quarterEnd);
-        break;
-      case 'lastquarter':
-        const lastQuarter = Math.floor(today.getMonth() / 3) - 1;
-        const lastQuarterYear = lastQuarter < 0 ? today.getFullYear() - 1 : today.getFullYear();
-        const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
-        const lastQuarterStart = new Date(lastQuarterYear, adjustedQuarter * 3, 1);
-        const lastQuarterEnd = new Date(lastQuarterYear, (adjustedQuarter + 1) * 3, 0);
-        newFilters.dateFrom = formatDate(lastQuarterStart);
-        newFilters.dateTo = formatDate(lastQuarterEnd);
-        break;
-      case 'clear':
-        newFilters.dateFrom = '';
-        newFilters.dateTo = '';
-        break;
+    try {
+      const today = new Date();
+      const formatDate = (date) => date.toISOString().split('T')[0];
+      
+      let newFilters = { ...filters, month: 'all' };
+      
+      switch (range) {
+        case 'last30':
+          const thirtyDaysAgo = new Date(today);
+          thirtyDaysAgo.setDate(today.getDate() - 30);
+          newFilters.dateFrom = formatDate(thirtyDaysAgo);
+          newFilters.dateTo = formatDate(today);
+          break;
+        case 'thisquarter':
+          const currentQuarter = Math.floor(today.getMonth() / 3);
+          const quarterStart = new Date(today.getFullYear(), currentQuarter * 3, 1);
+          const quarterEnd = new Date(today.getFullYear(), (currentQuarter + 1) * 3, 0);
+          newFilters.dateFrom = formatDate(quarterStart);
+          newFilters.dateTo = formatDate(quarterEnd);
+          break;
+        case 'lastquarter':
+          const lastQuarter = Math.floor(today.getMonth() / 3) - 1;
+          const lastQuarterYear = lastQuarter < 0 ? today.getFullYear() - 1 : today.getFullYear();
+          const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
+          const lastQuarterStart = new Date(lastQuarterYear, adjustedQuarter * 3, 1);
+          const lastQuarterEnd = new Date(lastQuarterYear, (adjustedQuarter + 1) * 3, 0);
+          newFilters.dateFrom = formatDate(lastQuarterStart);
+          newFilters.dateTo = formatDate(lastQuarterEnd);
+          break;
+        case 'clear':
+          newFilters.dateFrom = '';
+          newFilters.dateTo = '';
+          break;
+      }
+      
+      setFilters(newFilters);
+    } catch (dateRangeError) {
+      console.error('Error setting date range:', dateRangeError);
     }
-    
-    setFilters(newFilters);
   };
 
   const showTransactionDetails = (transaction) => {
-    setSelectedTransaction(transaction);
-    setShowModal(true);
+    if (transaction) {
+      setSelectedTransaction(transaction);
+      setShowModal(true);
+    }
   };
 
   const closeModal = () => {
@@ -264,29 +348,41 @@ export default function Dashboard() {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+    try {
+      const numAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(numAmount);
+    } catch (formatError) {
+      return '$0.00';
+    }
   };
 
   const getUniqueValues = (field) => {
-    return [...new Set(filteredData.map(t => t[field]))].sort();
+    try {
+      if (!Array.isArray(filteredData)) return [];
+      return [...new Set(filteredData.map(t => t && t[field]).filter(Boolean))].sort();
+    } catch (uniqueError) {
+      console.warn('Error getting unique values for', field, uniqueError);
+      return [];
+    }
   };
 
+  // Calculate summary statistics
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
   
-  const ytdTotal = filteredData
-    .filter(t => t.date.getFullYear() === currentYear)
-    .reduce((sum, t) => sum + t.amount, 0);
+  const ytdTotal = Array.isArray(filteredData) ? filteredData
+    .filter(t => t && t.date && t.date.getFullYear() === currentYear)
+    .reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0), 0) : 0;
   
-  const monthTotal = filteredData
-    .filter(t => t.date.getFullYear() === currentYear && t.date.getMonth() === currentMonth)
-    .reduce((sum, t) => sum + t.amount, 0);
+  const monthTotal = Array.isArray(filteredData) ? filteredData
+    .filter(t => t && t.date && t.date.getFullYear() === currentYear && t.date.getMonth() === currentMonth)
+    .reduce((sum, t) => sum + (typeof t.amount === 'number' ? t.amount : 0), 0) : 0;
   
-  const reimbursementCount = filteredData.filter(t => t.type === 'expense').length;
-  const receiptCount = data.receipts ? data.receipts.length : 0;
+  const reimbursementCount = Array.isArray(filteredData) ? filteredData.filter(t => t && t.type === 'expense').length : 0;
+  const receiptCount = Array.isArray(data.receipts) ? data.receipts.length : 0;
 
   return (
     <>
@@ -300,11 +396,19 @@ export default function Dashboard() {
           <h1>Travel & Entertainment Dashboard</h1>
           <div className="header-controls">
             <span>Last updated: {data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : 'Never'}</span>
-            <button className="btn-primary" onClick={fetchData}>Refresh Data</button>
+            <button className="btn-primary" onClick={fetchData} disabled={loading}>
+              {loading ? 'Loading...' : 'Refresh Data'}
+            </button>
           </div>
         </header>
 
         <main className="main">
+          {error && (
+            <div className="error">
+              {error}
+            </div>
+          )}
+          
           <div className="filters">
             <div className="filter-group">
               <label>Department:</label>
@@ -375,7 +479,7 @@ export default function Dashboard() {
               <label>Spend Category:</label>
               <select value={filters.spendCategory} onChange={(e) => handleFilterChange('spendCategory', e.target.value)}>
                 <option value="all">All Spend Categories</option>
-                {data.spendCategories.map(cat => (
+                {Array.isArray(data.spendCategories) && data.spendCategories.map(cat => (
                   <option key={cat.id || cat.name} value={cat.name || cat.display_name}>
                     {cat.name || cat.display_name || 'Unknown'}
                   </option>
@@ -387,7 +491,7 @@ export default function Dashboard() {
               <label>Spend Program:</label>
               <select value={filters.spendProgram} onChange={(e) => handleFilterChange('spendProgram', e.target.value)}>
                 <option value="all">All Spend Programs</option>
-                {data.spendPrograms.map(prog => (
+                {Array.isArray(data.spendPrograms) && data.spendPrograms.map(prog => (
                   <option key={prog.id || prog.name} value={prog.name || prog.display_name}>
                     {prog.name || prog.display_name || 'Unknown'}
                   </option>
@@ -437,7 +541,7 @@ export default function Dashboard() {
             </div>
             <div className="card">
               <h3>Transaction Count</h3>
-              <div className="count">{filteredData.length.toLocaleString()}</div>
+              <div className="count">{Array.isArray(filteredData) ? filteredData.length.toLocaleString() : '0'}</div>
             </div>
             <div className="card">
               <h3>Reimbursements</h3>
@@ -465,25 +569,25 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.slice(0, 50).map((transaction, index) => (
+                  {Array.isArray(filteredData) && filteredData.slice(0, 50).map((transaction, index) => (
                     <tr key={transaction.id || index} onClick={() => showTransactionDetails(transaction)} style={{cursor: 'pointer'}}>
-                      <td>{transaction.date.toLocaleDateString()}</td>
-                      <td>{transaction.employee}</td>
-                      <td>{transaction.department}</td>
-                      <td>{transaction.merchant}</td>
+                      <td>{transaction.date ? transaction.date.toLocaleDateString() : 'Unknown'}</td>
+                      <td>{transaction.employee || 'Unknown'}</td>
+                      <td>{transaction.department || 'Unknown'}</td>
+                      <td>{transaction.merchant || 'Unknown'}</td>
                       <td className="amount-cell">{formatCurrency(transaction.amount)}</td>
-                      <td>{transaction.location}</td>
+                      <td>{transaction.location || 'Unknown'}</td>
                       <td>
-                        <span className={`type-badge type-${transaction.type}`}>
+                        <span className={`type-badge type-${transaction.type || 'unknown'}`}>
                           {transaction.type === 'expense' ? 'Reimbursement' : 'Transaction'}
                         </span>
                       </td>
                     </tr>
                   ))}
-                  {filteredData.length === 0 && (
+                  {(!Array.isArray(filteredData) || filteredData.length === 0) && (
                     <tr>
                       <td colSpan="7" style={{textAlign: 'center', color: '#6b7280', fontStyle: 'italic'}}>
-                        No transactions found
+                        {loading ? 'Loading transactions...' : 'No transactions found'}
                       </td>
                     </tr>
                   )}
@@ -504,51 +608,51 @@ export default function Dashboard() {
               <div className="modal-body">
                 <div className="detail-grid">
                   <div className="detail-label">Date:</div>
-                  <div className="detail-value">{selectedTransaction.date.toLocaleDateString()}</div>
+                  <div className="detail-value">{selectedTransaction.date ? selectedTransaction.date.toLocaleDateString() : 'Unknown'}</div>
                   
                   <div className="detail-label">Employee:</div>
-                  <div className="detail-value">{selectedTransaction.employee}</div>
+                  <div className="detail-value">{selectedTransaction.employee || 'Unknown'}</div>
                   
                   <div className="detail-label">Department:</div>
-                  <div className="detail-value">{selectedTransaction.department}</div>
+                  <div className="detail-value">{selectedTransaction.department || 'Unknown'}</div>
                   
                   <div className="detail-label">Amount:</div>
                   <div className="detail-value">{formatCurrency(selectedTransaction.amount)}</div>
                   
                   <div className="detail-label">Merchant:</div>
-                  <div className="detail-value">{selectedTransaction.merchantDescriptor}</div>
+                  <div className="detail-value">{selectedTransaction.merchantDescriptor || 'Unknown'}</div>
                   
                   <div className="detail-label">Location:</div>
-                  <div className="detail-value">{selectedTransaction.location}</div>
+                  <div className="detail-value">{selectedTransaction.location || 'Unknown'}</div>
                   
                   <div className="detail-label">Employee Location:</div>
-                  <div className="detail-value">{selectedTransaction.cardHolderLocation}</div>
+                  <div className="detail-value">{selectedTransaction.cardHolderLocation || 'Unknown'}</div>
                   
                   <div className="detail-label">Accounting Category:</div>
-                  <div className="detail-value">{selectedTransaction.accountingCategory}</div>
+                  <div className="detail-value">{selectedTransaction.accountingCategory || 'Unknown'}</div>
                   
                   <div className="detail-label">Status:</div>
                   <div className="detail-value">
-                    <span className={`type-badge type-${selectedTransaction.type}`}>
-                      {selectedTransaction.state}
+                    <span className={`type-badge type-${selectedTransaction.type || 'unknown'}`}>
+                      {selectedTransaction.state || 'Unknown'}
                     </span>
                   </div>
                   
                   <div className="detail-label">Type:</div>
                   <div className="detail-value">
-                    <span className={`type-badge type-${selectedTransaction.type}`}>
+                    <span className={`type-badge type-${selectedTransaction.type || 'unknown'}`}>
                       {selectedTransaction.type === 'expense' ? 'Reimbursement' : 'Transaction'}
                     </span>
                   </div>
                   
                   <div className="detail-label">Memo:</div>
-                  <div className="detail-value">{selectedTransaction.memo}</div>
+                  <div className="detail-value">{selectedTransaction.memo || 'No memo'}</div>
                   
                   <div className="detail-label">Spend Category:</div>
-                  <div className="detail-value">{selectedTransaction.spendCategory}</div>
+                  <div className="detail-value">{selectedTransaction.spendCategory || 'Unknown'}</div>
                   
                   <div className="detail-label">Spend Program:</div>
-                  <div className="detail-value">{selectedTransaction.spendProgram}</div>
+                  <div className="detail-value">{selectedTransaction.spendProgram || 'Unknown'}</div>
                 </div>
               </div>
             </div>
@@ -559,12 +663,6 @@ export default function Dashboard() {
           <div className="loading">
             <div className="spinner"></div>
             <p>Loading data...</p>
-          </div>
-        )}
-
-        {error && (
-          <div className="error">
-            {error}
           </div>
         )}
       </div>
@@ -605,8 +703,13 @@ export default function Dashboard() {
           transition: background 0.2s;
         }
         
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
           background: #1d4ed8;
+        }
+        
+        .btn-primary:disabled {
+          background: #9ca3af;
+          cursor: not-allowed;
         }
         
         .main {
@@ -787,6 +890,11 @@ export default function Dashboard() {
           color: #166534;
         }
         
+        .type-unknown {
+          background-color: #f3f4f6;
+          color: #6b7280;
+        }
+        
         .modal {
           position: fixed;
           top: 0;
@@ -896,7 +1004,7 @@ export default function Dashboard() {
           color: #dc2626;
           padding: 1rem;
           border-radius: 6px;
-          margin: 1rem 0;
+          margin: 0 0 2rem 0;
           border: 1px solid #fecaca;
         }
         
@@ -928,7 +1036,7 @@ export default function Dashboard() {
           }
           
           .main {
-            padding: 0 1rem;
+            padding: 1rem;
           }
           
           .table-container {

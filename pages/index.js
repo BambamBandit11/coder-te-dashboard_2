@@ -114,6 +114,25 @@ export default function Dashboard() {
     return program ? (program.name || program.display_name || 'Unknown Program') : 'No Program';
   };
 
+  const getReceiptInfo = (transactionId) => {
+    if (!transactionId || !Array.isArray(data.receipts)) return { hasReceipt: false, receiptUrl: null };
+    
+    // Find receipt that matches this transaction
+    const receipt = data.receipts.find(r => 
+      r && (r.transaction_id === transactionId || r.expense_id === transactionId)
+    );
+    
+    if (receipt) {
+      return {
+        hasReceipt: true,
+        receiptUrl: receipt.receipt_url || receipt.image_url || receipt.url || null,
+        receiptId: receipt.id
+      };
+    }
+    
+    return { hasReceipt: false, receiptUrl: null };
+  };
+
   const processData = () => {
     const allTransactions = [];
     
@@ -131,6 +150,7 @@ export default function Dashboard() {
             );
             
             const location = expense.start_location || expense.end_location || 'Unknown';
+            const receiptInfo = getReceiptInfo(expense.id);
             
             allTransactions.push({
               id: expense.id || `expense-${Math.random()}`,
@@ -150,7 +170,9 @@ export default function Dashboard() {
               cardHolderLocation: 'N/A',
               memo: expense.memo || 'No memo',
               spendCategory: 'Reimbursement',
-              spendProgram: getSpendProgramName(expense.spend_program_id)
+              spendProgram: getSpendProgramName(expense.spend_program_id),
+              hasReceipt: receiptInfo.hasReceipt,
+              receiptUrl: receiptInfo.receiptUrl
             });
           } catch (expenseError) {
             console.warn('Error processing expense:', expenseError, expense);
@@ -173,6 +195,8 @@ export default function Dashboard() {
               [merchantLocation.city, merchantLocation.state, merchantLocation.country]
                 .filter(Boolean).join(', ') || 'Unknown' : 'Unknown';
             
+            const receiptInfo = getReceiptInfo(transaction.id);
+            
             allTransactions.push({
               id: transaction.id || `transaction-${Math.random()}`,
               date: new Date(transaction.user_transaction_time || Date.now()),
@@ -190,7 +214,9 @@ export default function Dashboard() {
               cardHolderLocation: transaction.card_holder?.location_name || 'Unknown',
               memo: transaction.memo || 'No memo',
               spendCategory: transaction.sk_category_name || 'Uncategorized',
-              spendProgram: getSpendProgramName(transaction.spend_program_id)
+              spendProgram: getSpendProgramName(transaction.spend_program_id),
+              hasReceipt: receiptInfo.hasReceipt,
+              receiptUrl: receiptInfo.receiptUrl
             });
           } catch (transactionError) {
             console.warn('Error processing transaction:', transactionError, transaction);
@@ -567,6 +593,7 @@ export default function Dashboard() {
                     <th>Location</th>
                     <th>Memo</th>
                     <th>Category</th>
+                    <th>Receipt</th>
                     <th>Type</th>
                   </tr>
                 </thead>
@@ -577,10 +604,29 @@ export default function Dashboard() {
                       <td>{transaction.employee || 'Unknown'}</td>
                       <td>{transaction.department || 'Unknown'}</td>
                       <td>{transaction.merchant || 'Unknown'}</td>
-                      <td className="amount-cell">{formatCurrency(transaction.amount)}</td>
+                      <td className="amount-cell" style={{position: 'relative'}}>
+                        <span 
+                          className={transaction.hasReceipt && transaction.receiptUrl ? 'amount-with-receipt' : ''}
+                          title={transaction.hasReceipt && transaction.receiptUrl ? 'Hover to see receipt' : ''}
+                        >
+                          {formatCurrency(transaction.amount)}
+                        </span>
+                        {transaction.hasReceipt && transaction.receiptUrl && (
+                          <div className="receipt-preview">
+                            <img src={transaction.receiptUrl} alt="Receipt" onError={(e) => e.target.style.display = 'none'} />
+                          </div>
+                        )}
+                      </td>
                       <td>{transaction.location || 'Unknown'}</td>
                       <td>{transaction.memo || 'No memo'}</td>
                       <td>{transaction.accountingCategory || 'Unknown'}</td>
+                      <td className="receipt-status">
+                        {transaction.hasReceipt ? (
+                          <span className="receipt-check" title="Has Receipt">✅</span>
+                        ) : (
+                          <span className="receipt-x" title="No Receipt">❌</span>
+                        )}
+                      </td>
                       <td>
                         <span className={`type-badge type-${transaction.type || 'unknown'}`}>
                           {transaction.type === 'expense' ? 'Reimbursement' : 'Transaction'}
@@ -590,7 +636,7 @@ export default function Dashboard() {
                   ))}
                   {(!Array.isArray(filteredData) || filteredData.length === 0) && (
                     <tr>
-                      <td colSpan="9" style={{textAlign: 'center', color: '#6b7280', fontStyle: 'italic'}}>
+                      <td colSpan="10" style={{textAlign: 'center', color: '#6b7280', fontStyle: 'italic'}}>
                         {loading ? 'Loading transactions...' : 'No transactions found'}
                       </td>
                     </tr>
@@ -874,6 +920,55 @@ export default function Dashboard() {
         .amount-cell {
           font-weight: 600;
           color: #059669;
+        }
+        
+        .amount-with-receipt {
+          cursor: help;
+          text-decoration: underline;
+          text-decoration-style: dotted;
+        }
+        
+        .receipt-preview {
+          position: absolute;
+          top: -10px;
+          left: 100%;
+          z-index: 1000;
+          background: white;
+          border: 2px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 8px;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 0.3s, visibility 0.3s;
+          pointer-events: none;
+          max-width: 300px;
+        }
+        
+        .amount-cell:hover .receipt-preview {
+          opacity: 1;
+          visibility: visible;
+        }
+        
+        .receipt-preview img {
+          max-width: 280px;
+          max-height: 400px;
+          width: auto;
+          height: auto;
+          border-radius: 4px;
+        }
+        
+        .receipt-status {
+          text-align: center;
+          font-size: 1.2rem;
+        }
+        
+        .receipt-check {
+          color: #059669;
+        }
+        
+        .receipt-x {
+          color: #dc2626;
         }
         
         .type-badge {

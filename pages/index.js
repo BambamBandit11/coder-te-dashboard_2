@@ -1,7 +1,26 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { useSession, signIn, signOut } from 'next-auth/react';
 
 export default function Dashboard() {
+  const { data: session, status } = useSession();
+  
+  // Show loading while checking authentication
+  if (status === 'loading') {
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+  
+  // Redirect to sign in if not authenticated
+  if (!session) {
+    signIn();
+    return null;
+  }
+
   const [data, setData] = useState({
     expenses: [],
     transactions: [],
@@ -491,6 +510,12 @@ export default function Dashboard() {
         <header className="header">
           <h1>Travel & Entertainment Dashboard</h1>
           <div className="header-controls">
+            <div className="user-info">
+              <span className="user-email">{session.user.email}</span>
+              <button className="sign-out-btn" onClick={() => signOut()}>
+                Sign Out
+              </button>
+            </div>
             <span>Last updated: {data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : 'Never'}</span>
             <button className="btn-primary" onClick={fetchData} disabled={loading}>
               {loading ? 'Loading...' : 'Refresh Data'}
@@ -789,6 +814,37 @@ export default function Dashboard() {
           display: flex;
           align-items: center;
           gap: 1rem;
+          flex-wrap: wrap;
+        }
+        
+        .user-info {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.5rem 1rem;
+          background: #f3f4f6;
+          border-radius: 6px;
+        }
+        
+        .user-email {
+          font-size: 0.875rem;
+          color: #374151;
+          font-weight: 500;
+        }
+        
+        .sign-out-btn {
+          background: #6b7280;
+          color: white;
+          border: none;
+          padding: 0.375rem 0.75rem;
+          border-radius: 4px;
+          font-size: 0.75rem;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        
+        .sign-out-btn:hover {
+          background: #4b5563;
         }
         
         .btn-primary {
@@ -1240,6 +1296,30 @@ export default function Dashboard() {
           border-radius: 50%;
           animation: spin 1s linear infinite;
           margin-bottom: 1rem;
+        }
+        
+        .loading-container {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: #f9fafb;
+        }
+        
+        .loading-container .spinner {
+          width: 40px;
+          height: 40px;
+          border: 4px solid #e5e7eb;
+          border-top: 4px solid #2563eb;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin-bottom: 1rem;
+        }
+        
+        .loading-container p {
+          color: #6b7280;
+          font-size: 1rem;
         }
         
         @keyframes spin {

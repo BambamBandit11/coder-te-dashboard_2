@@ -9,26 +9,9 @@ export default NextAuth({
     })
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
-      // Only allow @coder.com email addresses
-      if (user.email && user.email.endsWith('@coder.com')) {
-        return true
-      }
-      return false
-    },
-    async session({ session, token }) {
-      return session
-    },
-    async jwt({ token, user }) {
-      return token
+    async signIn({ user }) {
+      return user.email?.endsWith('@coder.com') || false
     }
-  },
-  pages: {
-    signIn: '/auth/signin',
-    error: '/auth/error',
-  },
-  session: {
-    strategy: 'jwt',
   },
   secret: process.env.NEXTAUTH_SECRET,
 })

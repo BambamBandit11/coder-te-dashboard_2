@@ -17,14 +17,13 @@ export default function Dashboard() {
   const [showModal, setShowModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [filters, setFilters] = useState({
-    department: 'all',
-    employee: 'all',
+    department: [],
+    employee: [],
     month: 'all',
-    merchant: 'all',
-    category: 'all',
+    merchant: [],
+    category: [],
     memo: '',
-    spendCategory: 'all',
-    spendProgram: 'all',
+    spendProgram: [],
     dateFrom: '',
     dateTo: ''
   });
@@ -244,12 +243,12 @@ export default function Dashboard() {
       const processed = processData();
       let filtered = [...processed];
       
-      if (filters.department !== 'all') {
-        filtered = filtered.filter(t => t && t.department === filters.department);
+      if (filters.department.length > 0) {
+        filtered = filtered.filter(t => t && filters.department.includes(t.department));
       }
       
-      if (filters.employee !== 'all') {
-        filtered = filtered.filter(t => t && t.employee === filters.employee);
+      if (filters.employee.length > 0) {
+        filtered = filtered.filter(t => t && filters.employee.includes(t.employee));
       }
       
       if (filters.month !== 'all') {
@@ -287,12 +286,12 @@ export default function Dashboard() {
         }
       }
       
-      if (filters.merchant !== 'all') {
-        filtered = filtered.filter(t => t && t.merchant === filters.merchant);
+      if (filters.merchant.length > 0) {
+        filtered = filtered.filter(t => t && filters.merchant.includes(t.merchant));
       }
       
-      if (filters.category !== 'all') {
-        filtered = filtered.filter(t => t && t.accountingCategory === filters.category);
+      if (filters.category.length > 0) {
+        filtered = filtered.filter(t => t && filters.category.includes(t.accountingCategory));
       }
       
       if (filters.memo && filters.memo.trim()) {
@@ -300,12 +299,8 @@ export default function Dashboard() {
         filtered = filtered.filter(t => t && t.memo && t.memo.toLowerCase().includes(memoLower));
       }
       
-      if (filters.spendCategory !== 'all') {
-        filtered = filtered.filter(t => t && t.spendCategory === filters.spendCategory);
-      }
-      
-      if (filters.spendProgram !== 'all') {
-        filtered = filtered.filter(t => t && t.spendProgram === filters.spendProgram);
+      if (filters.spendProgram.length > 0) {
+        filtered = filtered.filter(t => t && filters.spendProgram.includes(t.spendProgram));
       }
       
       setFilteredData(filtered);
@@ -317,6 +312,81 @@ export default function Dashboard() {
 
   const handleFilterChange = (filterName, value) => {
     setFilters(prev => ({ ...prev, [filterName]: value }));
+  };
+
+  const handleMultiSelectChange = (filterName, value, isSelected) => {
+    setFilters(prev => {
+      const currentValues = prev[filterName] || [];
+      if (isSelected) {
+        return { ...prev, [filterName]: [...currentValues, value] };
+      } else {
+        return { ...prev, [filterName]: currentValues.filter(v => v !== value) };
+      }
+    });
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      department: [],
+      employee: [],
+      month: 'all',
+      merchant: [],
+      category: [],
+      memo: '',
+      spendProgram: [],
+      dateFrom: '',
+      dateTo: ''
+    });
+  };
+
+  const MultiSelectFilter = ({ label, filterName, options, selectedValues }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
+    
+    const filteredOptions = options.filter(option => 
+      option.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    return (
+      <div className="filter-group">
+        <label>{label}:</label>
+        <div className="multi-select-container">
+          <div className="multi-select-header" onClick={() => setIsOpen(!isOpen)}>
+            <span className="selected-count">
+              {selectedValues.length === 0 ? `All ${label}s` : `${selectedValues.length} selected`}
+            </span>
+            <span className="dropdown-arrow">{isOpen ? '▲' : '▼'}</span>
+          </div>
+          {isOpen && (
+            <div className="multi-select-dropdown">
+              <input
+                type="text"
+                className="search-input"
+                placeholder={`Search ${label.toLowerCase()}s...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <div className="options-container">
+                {filteredOptions.map(option => (
+                  <label key={option} className="option-item">
+                    <input
+                      type="checkbox"
+                      checked={selectedValues.includes(option)}
+                      onChange={(e) => handleMultiSelectChange(filterName, option, e.target.checked)}
+                    />
+                    <span>{option}</span>
+                  </label>
+                ))}
+                {filteredOptions.length === 0 && (
+                  <div className="no-options">No matches found</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   const setDateRange = (range) => {
@@ -436,25 +506,19 @@ export default function Dashboard() {
           )}
           
           <div className="filters">
-            <div className="filter-group">
-              <label>Department:</label>
-              <select value={filters.department} onChange={(e) => handleFilterChange('department', e.target.value)}>
-                <option value="all">All Departments</option>
-                {getUniqueValues('department').map(dept => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
-            </div>
+            <MultiSelectFilter 
+              label="Department" 
+              filterName="department" 
+              options={getUniqueValues('department')} 
+              selectedValues={filters.department}
+            />
             
-            <div className="filter-group">
-              <label>Employee:</label>
-              <select value={filters.employee} onChange={(e) => handleFilterChange('employee', e.target.value)}>
-                <option value="all">All Employees</option>
-                {getUniqueValues('employee').map(emp => (
-                  <option key={emp} value={emp}>{emp}</option>
-                ))}
-              </select>
-            </div>
+            <MultiSelectFilter 
+              label="Employee" 
+              filterName="employee" 
+              options={getUniqueValues('employee')} 
+              selectedValues={filters.employee}
+            />
             
             <div className="filter-group">
               <label>Month:</label>
@@ -470,25 +534,19 @@ export default function Dashboard() {
               </select>
             </div>
             
-            <div className="filter-group">
-              <label>Merchant:</label>
-              <select value={filters.merchant} onChange={(e) => handleFilterChange('merchant', e.target.value)}>
-                <option value="all">All Merchants</option>
-                {getUniqueValues('merchant').map(merchant => (
-                  <option key={merchant} value={merchant}>{merchant}</option>
-                ))}
-              </select>
-            </div>
+            <MultiSelectFilter 
+              label="Merchant" 
+              filterName="merchant" 
+              options={getUniqueValues('merchant')} 
+              selectedValues={filters.merchant}
+            />
             
-            <div className="filter-group">
-              <label>Category:</label>
-              <select value={filters.category} onChange={(e) => handleFilterChange('category', e.target.value)}>
-                <option value="all">All Categories</option>
-                {getUniqueValues('accountingCategory').map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
+            <MultiSelectFilter 
+              label="Category" 
+              filterName="category" 
+              options={getUniqueValues('accountingCategory')} 
+              selectedValues={filters.category}
+            />
             
             <div className="filter-group">
               <label>Memo Search:</label>
@@ -501,29 +559,12 @@ export default function Dashboard() {
               />
             </div>
             
-            <div className="filter-group">
-              <label>Spend Category:</label>
-              <select value={filters.spendCategory} onChange={(e) => handleFilterChange('spendCategory', e.target.value)}>
-                <option value="all">All Spend Categories</option>
-                {Array.isArray(data.spendCategories) && data.spendCategories.map(cat => (
-                  <option key={cat.id || cat.name} value={cat.name || cat.display_name}>
-                    {cat.name || cat.display_name || 'Unknown'}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="filter-group">
-              <label>Spend Program:</label>
-              <select value={filters.spendProgram} onChange={(e) => handleFilterChange('spendProgram', e.target.value)}>
-                <option value="all">All Spend Programs</option>
-                {Array.isArray(data.spendPrograms) && data.spendPrograms.map(prog => (
-                  <option key={prog.id || prog.name} value={prog.name || prog.display_name}>
-                    {prog.name || prog.display_name || 'Unknown'}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <MultiSelectFilter 
+              label="Spend Program" 
+              filterName="spendProgram" 
+              options={Array.isArray(data.spendPrograms) ? data.spendPrograms.map(prog => prog.name || prog.display_name || 'Unknown').filter(Boolean) : []}
+              selectedValues={filters.spendProgram}
+            />
             
             <div className="filter-group">
               <label>From Date:</label>
@@ -553,6 +594,13 @@ export default function Dashboard() {
                 <button type="button" className="preset-btn" onClick={() => setDateRange('lastquarter')}>Last Quarter</button>
                 <button type="button" className="preset-btn" onClick={() => setDateRange('clear')}>Clear Dates</button>
               </div>
+            </div>
+            
+            <div className="filter-group clear-all">
+              <label>&nbsp;</label>
+              <button type="button" className="clear-all-btn" onClick={clearAllFilters}>
+                Clear All Filters
+              </button>
             </div>
           </div>
 
@@ -589,10 +637,10 @@ export default function Dashboard() {
                     <th>Employee</th>
                     <th>Department</th>
                     <th>Merchant</th>
+                    <th>Category</th>
                     <th>Amount</th>
                     <th>Location</th>
                     <th>Memo</th>
-                    <th>Category</th>
                     <th>Receipt</th>
                     <th>Type</th>
                   </tr>
@@ -604,27 +652,21 @@ export default function Dashboard() {
                       <td>{transaction.employee || 'Unknown'}</td>
                       <td>{transaction.department || 'Unknown'}</td>
                       <td>{transaction.merchant || 'Unknown'}</td>
-                      <td className="amount-cell" style={{position: 'relative'}}>
+                      <td>{transaction.accountingCategory || 'Unknown'}</td>
+                      <td className="amount-cell">{formatCurrency(transaction.amount)}</td>
+                      <td>{transaction.location || 'Unknown'}</td>
+                      <td>{transaction.memo || 'No memo'}</td>
+                      <td className="receipt-status" style={{position: 'relative'}}>
                         <span 
-                          className={transaction.hasReceipt && transaction.receiptUrl ? 'amount-with-receipt' : ''}
-                          title={transaction.hasReceipt && transaction.receiptUrl ? 'Hover to see receipt' : ''}
+                          className={transaction.hasReceipt && transaction.receiptUrl ? 'receipt-with-image' : ''}
+                          title={transaction.hasReceipt && transaction.receiptUrl ? 'Hover to see receipt' : (transaction.hasReceipt ? 'Has Receipt' : 'No Receipt')}
                         >
-                          {formatCurrency(transaction.amount)}
+                          {transaction.hasReceipt ? '✅' : '❌'}
                         </span>
                         {transaction.hasReceipt && transaction.receiptUrl && (
                           <div className="receipt-preview">
                             <img src={transaction.receiptUrl} alt="Receipt" onError={(e) => e.target.style.display = 'none'} />
                           </div>
-                        )}
-                      </td>
-                      <td>{transaction.location || 'Unknown'}</td>
-                      <td>{transaction.memo || 'No memo'}</td>
-                      <td>{transaction.accountingCategory || 'Unknown'}</td>
-                      <td className="receipt-status">
-                        {transaction.hasReceipt ? (
-                          <span className="receipt-check" title="Has Receipt">✅</span>
-                        ) : (
-                          <span className="receipt-x" title="No Receipt">❌</span>
                         )}
                       </td>
                       <td>
@@ -922,10 +964,8 @@ export default function Dashboard() {
           color: #059669;
         }
         
-        .amount-with-receipt {
+        .receipt-with-image {
           cursor: help;
-          text-decoration: underline;
-          text-decoration-style: dotted;
         }
         
         .receipt-preview {
@@ -945,7 +985,7 @@ export default function Dashboard() {
           max-width: 300px;
         }
         
-        .amount-cell:hover .receipt-preview {
+        .receipt-status:hover .receipt-preview {
           opacity: 1;
           visibility: visible;
         }
@@ -963,12 +1003,109 @@ export default function Dashboard() {
           font-size: 1.2rem;
         }
         
-        .receipt-check {
-          color: #059669;
+        .multi-select-container {
+          position: relative;
         }
         
-        .receipt-x {
-          color: #dc2626;
+        .multi-select-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.5rem;
+          border: 1px solid #d1d5db;
+          border-radius: 0.375rem;
+          background-color: white;
+          cursor: pointer;
+          font-size: 0.875rem;
+        }
+        
+        .multi-select-header:hover {
+          border-color: #9ca3af;
+        }
+        
+        .selected-count {
+          color: #374151;
+        }
+        
+        .dropdown-arrow {
+          color: #6b7280;
+          font-size: 0.75rem;
+        }
+        
+        .multi-select-dropdown {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          z-index: 1000;
+          background: white;
+          border: 1px solid #d1d5db;
+          border-radius: 0.375rem;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          max-height: 200px;
+          overflow-y: auto;
+        }
+        
+        .search-input {
+          width: 100%;
+          padding: 0.5rem;
+          border: none;
+          border-bottom: 1px solid #e5e7eb;
+          font-size: 0.875rem;
+          outline: none;
+        }
+        
+        .search-input:focus {
+          border-bottom-color: #3b82f6;
+        }
+        
+        .options-container {
+          max-height: 150px;
+          overflow-y: auto;
+        }
+        
+        .option-item {
+          display: flex;
+          align-items: center;
+          padding: 0.5rem;
+          cursor: pointer;
+          font-size: 0.875rem;
+        }
+        
+        .option-item:hover {
+          background-color: #f3f4f6;
+        }
+        
+        .option-item input[type="checkbox"] {
+          margin-right: 0.5rem;
+        }
+        
+        .no-options {
+          padding: 0.5rem;
+          text-align: center;
+          color: #6b7280;
+          font-style: italic;
+          font-size: 0.875rem;
+        }
+        
+        .clear-all {
+          grid-column: span 2;
+        }
+        
+        .clear-all-btn {
+          width: 100%;
+          padding: 0.75rem 1.5rem;
+          background: #dc2626;
+          color: white;
+          border: none;
+          border-radius: 0.375rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        
+        .clear-all-btn:hover {
+          background: #b91c1c;
         }
         
         .type-badge {

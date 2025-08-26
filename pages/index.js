@@ -176,7 +176,7 @@ export default function Dashboard() {
             allTransactions.push({
               id: transaction.id || `transaction-${Math.random()}`,
               date: new Date(transaction.user_transaction_time || Date.now()),
-              amount: typeof transaction.amount === 'number' ? transaction.amount / 100 : 0,
+              amount: typeof transaction.amount === 'number' ? transaction.amount : 0,
               currency: transaction.currency_code || 'USD',
               employee: transaction.card_holder ? 
                 `${transaction.card_holder.first_name || ''} ${transaction.card_holder.last_name || ''}`.trim() || 'Unknown' : 'Unknown',
@@ -565,6 +565,8 @@ export default function Dashboard() {
                     <th>Merchant</th>
                     <th>Amount</th>
                     <th>Location</th>
+                    <th>Memo</th>
+                    <th>Category</th>
                     <th>Type</th>
                   </tr>
                 </thead>
@@ -577,6 +579,8 @@ export default function Dashboard() {
                       <td>{transaction.merchant || 'Unknown'}</td>
                       <td className="amount-cell">{formatCurrency(transaction.amount)}</td>
                       <td>{transaction.location || 'Unknown'}</td>
+                      <td>{transaction.memo || 'No memo'}</td>
+                      <td>{transaction.accountingCategory || 'Unknown'}</td>
                       <td>
                         <span className={`type-badge type-${transaction.type || 'unknown'}`}>
                           {transaction.type === 'expense' ? 'Reimbursement' : 'Transaction'}
@@ -586,7 +590,7 @@ export default function Dashboard() {
                   ))}
                   {(!Array.isArray(filteredData) || filteredData.length === 0) && (
                     <tr>
-                      <td colSpan="7" style={{textAlign: 'center', color: '#6b7280', fontStyle: 'italic'}}>
+                      <td colSpan="9" style={{textAlign: 'center', color: '#6b7280', fontStyle: 'italic'}}>
                         {loading ? 'Loading transactions...' : 'No transactions found'}
                       </td>
                     </tr>

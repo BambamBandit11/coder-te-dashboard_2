@@ -13,8 +13,5 @@ export default NextAuth({
       return user.email?.endsWith('@coder.com') || false
     }
   },
-  pages: {
-    signIn: '/api/auth/signin',
-  },
   secret: process.env.NEXTAUTH_SECRET,
 })

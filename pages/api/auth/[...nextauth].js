@@ -15,9 +15,20 @@ export default NextAuth({
         return true
       }
       return false
+    },
+    async session({ session, token }) {
+      return session
+    },
+    async jwt({ token, user }) {
+      return token
     }
+  },
+  pages: {
+    signIn: '/auth/signin',
+    error: '/auth/error',
   },
   session: {
     strategy: 'jwt',
   },
+  secret: process.env.NEXTAUTH_SECRET,
 })

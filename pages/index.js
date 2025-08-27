@@ -4,8 +4,17 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
-  
-  // Show loading while checking authentication
+  const [customUser, setCustomUser] = useState(null);
+
+  useEffect(() => {
+    if (!session) {
+      fetch('/api/auth/session')
+        .then((r) => r.ok ? r.json() : { user: null })
+        .then((data) => setCustomUser(data.user || null))
+        .catch(() => setCustomUser(null));
+    }
+  }, [session]);
+
   if (status === 'loading') {
     return (
       <div className="loading-container">
@@ -14,12 +23,17 @@ export default function Dashboard() {
       </div>
     );
   }
-  
-  // Redirect to sign in if not authenticated
-  if (!session) {
-    signIn();
-    return null;
+
+  if (!session && !customUser) {
+    return (
+      <div className="loading-container" style={{gap: '1rem'}}>
+        <p>You must sign in to continue.</p>
+        <a href="/api/auth/google" className="btn-primary" style={{textDecoration: 'none', padding: '0.75rem 1.5rem', borderRadius: 6}}>Sign in with Google</a>
+      </div>
+    );
   }
+
+  const authedEmail = session?.user?.email || customUser?.email;
 
   const [data, setData] = useState({
     expenses: [],
@@ -511,8 +525,12 @@ export default function Dashboard() {
           <h1>Travel & Entertainment Dashboard</h1>
           <div className="header-controls">
             <div className="user-info">
-              <span className="user-email">{session.user.email}</span>
-              <button className="sign-out-btn" onClick={() => signOut()}>
+              <span className="user-email">{authedEmail}</span>
+              <button className="sign-out-btn" onClick={() => {
+                // Best-effort signout
+                document.cookie = 'session_token=; Path=/; Max-Age=0';
+                if (typeof window !== 'undefined') window.location.href = '/auth/signin';
+              }}>
                 Sign Out
               </button>
             </div>

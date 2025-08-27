@@ -6,18 +6,20 @@ function baseUrl(req) {
   return `${proto}://${host}`
 }
 
-// Decrypt state parameter (stateless)
+// Decrypt state parameter (stateless) - Vercel compatible
 function decryptState(encryptedState) {
   try {
-    const secret = process.env.NEXTAUTH_SECRET || process.env.SESSION_SECRET || 'fallback-secret-key'
+    const secret = process.env.NEXTAUTH_SECRET || process.env.SESSION_SECRET || 'default-fallback-key-change-in-production'
     const [ivHex, encrypted] = encryptedState.split(':')
     if (!ivHex || !encrypted) throw new Error('Invalid state format')
     
-    const decipher = crypto.createDecipher('aes-256-cbc', secret)
+    const algorithm = 'aes-256-ctr'
+    const decipher = crypto.createDecipher(algorithm, secret)
     let decrypted = decipher.update(encrypted, 'hex', 'utf8')
     decrypted += decipher.final('utf8')
     return JSON.parse(decrypted)
   } catch (e) {
+    console.error('Decryption error:', e)
     throw new Error('Failed to decrypt state: ' + e.message)
   }
 }

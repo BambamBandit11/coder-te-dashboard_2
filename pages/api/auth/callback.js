@@ -6,15 +6,20 @@ function baseUrl(req) {
   return `${proto}://${host}`
 }
 
-function parseCookies(req) {
-  const header = req.headers.cookie || ''
-  const out = {}
-  header.split(';').forEach(p => {
-    const [k, ...rest] = p.trim().split('=')
-    if (!k) return
-    out[k] = decodeURIComponent(rest.join('='))
-  })
-  return out
+// Decrypt state parameter (stateless)
+function decryptState(encryptedState) {
+  try {
+    const secret = process.env.NEXTAUTH_SECRET || process.env.SESSION_SECRET || 'fallback-secret-key'
+    const [ivHex, encrypted] = encryptedState.split(':')
+    if (!ivHex || !encrypted) throw new Error('Invalid state format')
+    
+    const decipher = crypto.createDecipher('aes-256-cbc', secret)
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8')
+    decrypted += decipher.final('utf8')
+    return JSON.parse(decrypted)
+  } catch (e) {
+    throw new Error('Failed to decrypt state: ' + e.message)
+  }
 }
 
 function setCookie(res, name, value, opts = {}) {
@@ -44,18 +49,6 @@ export default async function handler(req, res) {
     return res.redirect(`/auth/error?error=${encodeURIComponent(oauthError)}`)
   }
   
-  const cookies = parseCookies(req)
-  
-  // Debug logging for production troubleshooting
-  console.log('Callback debug:', {
-    hasCode: !!code,
-    hasState: !!state,
-    receivedState: state,
-    cookieState: cookies.oauth_state,
-    hasVerifier: !!cookies.pkce_verifier,
-    allCookies: Object.keys(cookies)
-  })
-  
   if (!code) {
     return res.status(400).json({ error: 'Missing authorization code' })
   }
@@ -64,20 +57,24 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing state parameter' })
   }
   
-  if (!cookies.oauth_state) {
-    return res.status(400).json({ error: 'Missing state cookie - cookies may not be working' })
+  // Decrypt state to get verifier (no cookies needed)
+  let stateData
+  try {
+    stateData = decryptState(state)
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid state parameter', detail: e.message })
   }
   
-  if (state !== cookies.oauth_state) {
-    return res.status(400).json({ 
-      error: 'State mismatch', 
-      debug: { received: state, expected: cookies.oauth_state }
-    })
+  // Check timestamp (10 minute expiry)
+  const now = Date.now()
+  const maxAge = 10 * 60 * 1000 // 10 minutes
+  if (now - stateData.timestamp > maxAge) {
+    return res.status(400).json({ error: 'State expired' })
   }
-
-  const verifier = cookies.pkce_verifier
+  
+  const verifier = stateData.verifier
   if (!verifier) {
-    return res.status(400).json({ error: 'Missing PKCE verifier cookie' })
+    return res.status(400).json({ error: 'Missing PKCE verifier in state' })
   }
 
   try {
@@ -114,9 +111,6 @@ export default async function handler(req, res) {
 
     const email = profile.email || ''
     if (!email.endsWith('@coder.com')) {
-      // Clear cookies
-      setCookie(res, 'oauth_state', '', { maxAge: 0 })
-      setCookie(res, 'pkce_verifier', '', { maxAge: 0 })
       return res.redirect('/auth/error?error=AccessDenied')
     }
 
@@ -136,10 +130,6 @@ export default async function handler(req, res) {
 
     const secure = (req.headers['x-forwarded-proto'] || '').toString().includes('https')
     setCookie(res, 'session_token', sessionToken, { httpOnly: true, secure, path: '/', sameSite: 'Lax', maxAge: 60 * 60 * 8 })
-
-    // Clear temporary cookies
-    setCookie(res, 'oauth_state', '', { maxAge: 0 })
-    setCookie(res, 'pkce_verifier', '', { maxAge: 0 })
 
     return res.redirect('/')
   } catch (e) {

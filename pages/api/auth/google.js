@@ -6,25 +6,14 @@ function baseUrl(req) {
   return `${proto}://${host}`
 }
 
-function setCookie(res, name, value, opts = {}) {
-  const parts = []
-  parts.push(`${name}=${encodeURIComponent(value)}`)
-  parts.push(`Path=${opts.path || '/'}`)
-  parts.push(`SameSite=${opts.sameSite || 'Lax'}`)
-  if (opts.httpOnly !== false) parts.push('HttpOnly')
-  if (opts.secure) parts.push('Secure')
-  if (opts.maxAge) parts.push(`Max-Age=${opts.maxAge}`)
-  if (opts.domain) parts.push(`Domain=${opts.domain}`)
-  if (opts.expires) parts.push(`Expires=${opts.expires.toUTCString()}`)
-  
-  // Set multiple cookies with different configurations for compatibility
-  const cookieStrings = [
-    parts.join('; '),
-    // Fallback without HttpOnly for debugging
-    parts.filter(p => p !== 'HttpOnly').join('; ')
-  ]
-  
-  res.setHeader('Set-Cookie', cookieStrings)
+// Encrypt data into state parameter (stateless)
+function encryptState(data) {
+  const secret = process.env.NEXTAUTH_SECRET || process.env.SESSION_SECRET || 'fallback-secret-key'
+  const iv = crypto.randomBytes(16)
+  const cipher = crypto.createCipher('aes-256-cbc', secret)
+  let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'hex')
+  encrypted += cipher.final('hex')
+  return iv.toString('hex') + ':' + encrypted
 }
 
 export default async function handler(req, res) {
@@ -36,7 +25,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Google OAuth not configured' })
   }
 
-  const state = crypto.randomBytes(24).toString('hex')
   const verifier = crypto.randomBytes(32).toString('base64url')
   const challenge = crypto
     .createHash('sha256')
@@ -46,18 +34,12 @@ export default async function handler(req, res) {
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
 
-  // Store state and PKCE verifier short-lived in cookies
-  const secure = (req.headers['x-forwarded-proto'] || '').toString().includes('https') || req.headers.host?.includes('vercel.app')
-  const cookieOpts = { 
-    httpOnly: true, 
-    secure, 
-    maxAge: 600, // 10 minutes instead of 5
-    sameSite: 'Lax',
-    path: '/'
+  // Encrypt state and verifier into the state parameter (no cookies needed)
+  const stateData = {
+    verifier,
+    timestamp: Date.now()
   }
-  
-  setCookie(res, 'oauth_state', state, cookieOpts)
-  setCookie(res, 'pkce_verifier', verifier, cookieOpts)
+  const encryptedState = encryptState(stateData)
 
   const redirectUri = `${baseUrl(req)}/api/auth/callback`
   const params = new URLSearchParams({
@@ -67,7 +49,7 @@ export default async function handler(req, res) {
     scope: 'openid email profile',
     access_type: 'online',
     include_granted_scopes: 'true',
-    state,
+    state: encryptedState,
     code_challenge: challenge,
     code_challenge_method: 'S256',
     prompt: 'select_account'

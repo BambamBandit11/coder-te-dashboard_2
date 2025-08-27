@@ -6,20 +6,14 @@ function baseUrl(req) {
   return `${proto}://${host}`
 }
 
-// Encrypt data into state parameter (stateless) - Vercel compatible
-function encryptState(data) {
+// Simple Base64 encoding instead of encryption (Vercel compatible)
+function encodeState(data) {
   try {
-    const secret = process.env.NEXTAUTH_SECRET || process.env.SESSION_SECRET || 'default-fallback-key-change-in-production'
     const text = JSON.stringify(data)
-    const algorithm = 'aes-256-ctr'
-    const iv = crypto.randomBytes(16)
-    const cipher = crypto.createCipher(algorithm, secret)
-    let encrypted = cipher.update(text, 'utf8', 'hex')
-    encrypted += cipher.final('hex')
-    return iv.toString('hex') + ':' + encrypted
+    return Buffer.from(text, 'utf8').toString('base64url')
   } catch (e) {
-    console.error('Encryption error:', e)
-    throw new Error('Failed to encrypt state')
+    console.error('Encoding error:', e)
+    throw new Error('Failed to encode state')
   }
 }
 
@@ -43,17 +37,17 @@ export default async function handler(req, res) {
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
 
-    // Encrypt state and verifier into the state parameter (no cookies needed)
+    // Encode state and verifier into the state parameter (Base64 instead of encryption)
     const stateData = {
       verifier,
       timestamp: Date.now()
     }
     
-    let encryptedState
+    let encodedState
     try {
-      encryptedState = encryptState(stateData)
+      encodedState = encodeState(stateData)
     } catch (e) {
-      console.error('State encryption failed:', e)
+      console.error('State encoding failed:', e)
       return res.status(500).json({ error: 'Failed to create OAuth state' })
     }
 
@@ -65,7 +59,7 @@ export default async function handler(req, res) {
       scope: 'openid email profile',
       access_type: 'online',
       include_granted_scopes: 'true',
-      state: encryptedState,
+      state: encodedState,
       code_challenge: challenge,
       code_challenge_method: 'S256',
       prompt: 'select_account'

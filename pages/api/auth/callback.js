@@ -6,21 +6,14 @@ function baseUrl(req) {
   return `${proto}://${host}`
 }
 
-// Decrypt state parameter (stateless) - Vercel compatible
-function decryptState(encryptedState) {
+// Decode state parameter (Base64 instead of decryption) - Vercel compatible
+function decodeState(encodedState) {
   try {
-    const secret = process.env.NEXTAUTH_SECRET || process.env.SESSION_SECRET || 'default-fallback-key-change-in-production'
-    const [ivHex, encrypted] = encryptedState.split(':')
-    if (!ivHex || !encrypted) throw new Error('Invalid state format')
-    
-    const algorithm = 'aes-256-ctr'
-    const decipher = crypto.createDecipher(algorithm, secret)
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8')
-    decrypted += decipher.final('utf8')
-    return JSON.parse(decrypted)
+    const text = Buffer.from(encodedState, 'base64url').toString('utf8')
+    return JSON.parse(text)
   } catch (e) {
-    console.error('Decryption error:', e)
-    throw new Error('Failed to decrypt state: ' + e.message)
+    console.error('Decoding error:', e)
+    throw new Error('Failed to decode state: ' + e.message)
   }
 }
 
@@ -59,10 +52,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing state parameter' })
   }
   
-  // Decrypt state to get verifier (no cookies needed)
+  // Decode state to get verifier (Base64 instead of decryption)
   let stateData
   try {
-    stateData = decryptState(state)
+    stateData = decodeState(state)
   } catch (e) {
     return res.status(400).json({ error: 'Invalid state parameter', detail: e.message })
   }

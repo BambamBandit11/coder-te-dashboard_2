@@ -37,14 +37,48 @@ export default async function handler(req, res) {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
   if (!clientId || !clientSecret) return res.status(500).json({ error: 'OAuth not configured' })
 
-  const { code, state } = req.query
+  const { code, state, error: oauthError } = req.query
+  
+  // Handle OAuth errors from Google
+  if (oauthError) {
+    return res.redirect(`/auth/error?error=${encodeURIComponent(oauthError)}`)
+  }
+  
   const cookies = parseCookies(req)
-  if (!code || !state || !cookies.oauth_state || state !== cookies.oauth_state) {
-    return res.status(400).json({ error: 'Invalid state or code' })
+  
+  // Debug logging for production troubleshooting
+  console.log('Callback debug:', {
+    hasCode: !!code,
+    hasState: !!state,
+    receivedState: state,
+    cookieState: cookies.oauth_state,
+    hasVerifier: !!cookies.pkce_verifier,
+    allCookies: Object.keys(cookies)
+  })
+  
+  if (!code) {
+    return res.status(400).json({ error: 'Missing authorization code' })
+  }
+  
+  if (!state) {
+    return res.status(400).json({ error: 'Missing state parameter' })
+  }
+  
+  if (!cookies.oauth_state) {
+    return res.status(400).json({ error: 'Missing state cookie - cookies may not be working' })
+  }
+  
+  if (state !== cookies.oauth_state) {
+    return res.status(400).json({ 
+      error: 'State mismatch', 
+      debug: { received: state, expected: cookies.oauth_state }
+    })
   }
 
   const verifier = cookies.pkce_verifier
-  if (!verifier) return res.status(400).json({ error: 'Missing PKCE verifier' })
+  if (!verifier) {
+    return res.status(400).json({ error: 'Missing PKCE verifier cookie' })
+  }
 
   try {
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {

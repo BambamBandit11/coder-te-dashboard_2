@@ -16,7 +16,15 @@ function setCookie(res, name, value, opts = {}) {
   if (opts.maxAge) parts.push(`Max-Age=${opts.maxAge}`)
   if (opts.domain) parts.push(`Domain=${opts.domain}`)
   if (opts.expires) parts.push(`Expires=${opts.expires.toUTCString()}`)
-  res.setHeader('Set-Cookie', parts.join('; '))
+  
+  // Set multiple cookies with different configurations for compatibility
+  const cookieStrings = [
+    parts.join('; '),
+    // Fallback without HttpOnly for debugging
+    parts.filter(p => p !== 'HttpOnly').join('; ')
+  ]
+  
+  res.setHeader('Set-Cookie', cookieStrings)
 }
 
 export default async function handler(req, res) {
@@ -39,9 +47,17 @@ export default async function handler(req, res) {
     .replace(/\//g, '_')
 
   // Store state and PKCE verifier short-lived in cookies
-  const secure = (req.headers['x-forwarded-proto'] || '').toString().includes('https')
-  setCookie(res, 'oauth_state', state, { httpOnly: true, secure, maxAge: 300 })
-  setCookie(res, 'pkce_verifier', verifier, { httpOnly: true, secure, maxAge: 300 })
+  const secure = (req.headers['x-forwarded-proto'] || '').toString().includes('https') || req.headers.host?.includes('vercel.app')
+  const cookieOpts = { 
+    httpOnly: true, 
+    secure, 
+    maxAge: 600, // 10 minutes instead of 5
+    sameSite: 'Lax',
+    path: '/'
+  }
+  
+  setCookie(res, 'oauth_state', state, cookieOpts)
+  setCookie(res, 'pkce_verifier', verifier, cookieOpts)
 
   const redirectUri = `${baseUrl(req)}/api/auth/callback`
   const params = new URLSearchParams({

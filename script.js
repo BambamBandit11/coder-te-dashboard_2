@@ -133,6 +133,7 @@ class TEDashboard {
 
     bindEvents() {
         document.getElementById('refresh-btn').addEventListener('click', () => this.refreshData());
+        document.getElementById('export-csv').addEventListener('click', () => this.exportToCSV());
         document.getElementById('department-filter').addEventListener('change', () => this.applyFilters());
         document.getElementById('employee-filter').addEventListener('change', () => this.applyFilters());
         document.getElementById('month-filter').addEventListener('change', () => this.applyFilters());
@@ -1193,6 +1194,128 @@ class TEDashboard {
         }
         
         this.applyFilters();
+    }
+    
+    exportToCSV() {
+        // Get current filtered data
+        const departmentFilter = document.getElementById('department-filter').value;
+        const employeeFilter = document.getElementById('employee-filter').value;
+        const monthFilter = document.getElementById('month-filter').value;
+        const merchantFilter = document.getElementById('merchant-filter').value;
+        const categoryFilter = document.getElementById('category-filter').value;
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo = document.getElementById('date-to').value;
+        const memoFilter = document.getElementById('memo-filter').value.toLowerCase().trim();
+        const spendCategoryFilter = document.getElementById('spend-category-filter').value;
+        const spendProgramFilter = document.getElementById('spend-program-filter').value;
+        const typeFilter = document.getElementById('type-filter').value;
+        
+        let filtered = [...this.filteredData];
+        
+        // Apply all filters (same logic as applyFilters)
+        if (departmentFilter !== 'all') {
+            filtered = filtered.filter(t => t.department === departmentFilter);
+        }
+        if (employeeFilter !== 'all') {
+            filtered = filtered.filter(t => t.employee === employeeFilter);
+        }
+        if (typeFilter !== 'all') {
+            filtered = filtered.filter(t => t.type === typeFilter);
+        }
+        
+        // Apply month filter (takes precedence over date range if both are set)
+        if (monthFilter !== 'all') {
+            const [year, month] = monthFilter.split('-');
+            filtered = filtered.filter(t => {
+                const transactionYear = t.date.getFullYear();
+                const transactionMonth = t.date.getMonth() + 1;
+                return transactionYear === parseInt(year) && transactionMonth === parseInt(month);
+            });
+        } else {
+            // Apply date range filter only if month filter is not set
+            if (dateFrom) {
+                const fromDate = new Date(dateFrom);
+                filtered = filtered.filter(t => t.date >= fromDate);
+            }
+            
+            if (dateTo) {
+                const toDate = new Date(dateTo);
+                filtered = filtered.filter(t => t.date <= toDate);
+            }
+        }
+        
+        if (merchantFilter !== 'all') {
+            filtered = filtered.filter(t => t.merchant === merchantFilter);
+        }
+        if (categoryFilter !== 'all') {
+            filtered = filtered.filter(t => t.accountingCategory === categoryFilter);
+        }
+        if (memoFilter) {
+            filtered = filtered.filter(t => t.memo.toLowerCase().includes(memoFilter));
+        }
+        if (spendCategoryFilter !== 'all') {
+            filtered = filtered.filter(t => t.spendCategory === spendCategoryFilter);
+        }
+        if (spendProgramFilter !== 'all') {
+            filtered = filtered.filter(t => t.spendProgram === spendProgramFilter);
+        }
+        
+        // Sort the data
+        const sortedData = [...filtered].sort((a, b) => {
+            let aVal = a[this.sortColumn];
+            let bVal = b[this.sortColumn];
+            
+            if (this.sortColumn === 'date') {
+                aVal = new Date(aVal);
+                bVal = new Date(bVal);
+            } else if (this.sortColumn === 'amount') {
+                aVal = parseFloat(aVal) || 0;
+                bVal = parseFloat(bVal) || 0;
+            } else {
+                aVal = String(aVal).toLowerCase();
+                bVal = String(bVal).toLowerCase();
+            }
+            
+            if (this.sortDirection === 'asc') {
+                return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+            } else {
+                return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+            }
+        });
+        
+        // Create CSV content
+        const headers = ['Date', 'Employee', 'Department', 'Merchant', 'Amount', 'Location', 'Type', 'Category', 'Memo'];
+        const csvContent = [headers.join(',')];
+        
+        sortedData.forEach(transaction => {
+            const row = [
+                transaction.date.toLocaleDateString(),
+                `"${transaction.employee}"`,
+                `"${transaction.department}"`,
+                `"${transaction.merchant}"`,
+                transaction.amount,
+                `"${transaction.location}"`,
+                transaction.type === 'expense' ? 'Reimbursement' : 'Transaction',
+                `"${transaction.accountingCategory}"`,
+                `"${transaction.memo.replace(/"/g, '""')}"`
+            ];
+            csvContent.push(row.join(','));
+        });
+        
+        // Create and download the file
+        const csvString = csvContent.join('\n');
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `te-dashboard-export-${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     }
     
     getSpendProgramName(spendProgramId) {

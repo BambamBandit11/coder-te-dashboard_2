@@ -2,9 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  experimental: {
-    appDir: false
-  },
   env: {
     RAMP_CLIENT_ID: process.env.RAMP_CLIENT_ID,
     RAMP_CLIENT_SECRET: process.env.RAMP_CLIENT_SECRET,

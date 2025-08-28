@@ -129,7 +129,7 @@ export default async function handler(
             totalTransactions: transactions.length,
             totalReimbursements: reimbursements.length,
             status: 'success',
-            warnings: []
+            warnings: [] as string[]
         };
 
         // Add warnings if some data failed

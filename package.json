@@ -2,17 +2,10 @@
   "name": "coder-te-dashboard",
   "version": "1.0.0",
   "description": "Travel & Entertainment Dashboard for Coder Finance",
-  "main": "index.js",
+  "main": "index.html",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "next": "^14.0.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "next-auth": "^4.21.1"
+    "start": "python3 -m http.server 8000",
+    "dev": "python3 -m http.server 8000"
   },
   "engines": {
     "node": ">=18"

@@ -8,6 +8,14 @@ class TEDashboard {
         this.filteredData = [];
         this.sortColumn = 'date';
         this.sortDirection = 'desc';
+        this.isOnline = navigator.onLine;
+        this.retryCount = 0;
+        this.maxRetries = 3;
+        this.healthCheckInterval = null;
+        this.lastSuccessfulFetch = null;
+        
+        // Initialize offline/online detection
+        this.setupConnectivityMonitoring();
         this.init();
     }
 
@@ -15,6 +23,112 @@ class TEDashboard {
         this.bindEvents();
         this.loadData();
         this.populateMonthFilter();
+        this.startHealthMonitoring();
+    }
+
+    setupConnectivityMonitoring() {
+        window.addEventListener('online', () => {
+            this.isOnline = true;
+            this.showConnectivityStatus('online');
+            this.loadData(); // Retry loading when back online
+        });
+        
+        window.addEventListener('offline', () => {
+            this.isOnline = false;
+            this.showConnectivityStatus('offline');
+        });
+    }
+
+    showConnectivityStatus(status) {
+        const statusElement = document.getElementById('connectivity-status') || this.createConnectivityStatus();
+        
+        if (status === 'offline') {
+            statusElement.textContent = '⚠️ Offline - Showing cached data';
+            statusElement.className = 'connectivity-status offline';
+            statusElement.style.display = 'block';
+        } else {
+            statusElement.textContent = '✅ Back online - Refreshing data';
+            statusElement.className = 'connectivity-status online';
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 3000);
+        }
+    }
+
+    createConnectivityStatus() {
+        const statusElement = document.createElement('div');
+        statusElement.id = 'connectivity-status';
+        statusElement.className = 'connectivity-status';
+        statusElement.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #f59e0b;
+            color: white;
+            text-align: center;
+            padding: 8px;
+            z-index: 1000;
+            display: none;
+        `;
+        document.body.insertBefore(statusElement, document.body.firstChild);
+        return statusElement;
+    }
+
+    startHealthMonitoring() {
+        // Check API health every 30 seconds
+        this.healthCheckInterval = setInterval(() => {
+            this.performHealthCheck();
+        }, 30000);
+    }
+
+    async performHealthCheck() {
+        try {
+            const response = await fetch('/api/ramp-data?health=true', {
+                method: 'HEAD',
+                timeout: 5000
+            });
+            
+            if (response.ok) {
+                this.updateHealthStatus('healthy');
+            } else {
+                this.updateHealthStatus('degraded');
+            }
+        } catch (error) {
+            this.updateHealthStatus('unhealthy');
+        }
+    }
+
+    updateHealthStatus(status) {
+        const healthIndicator = document.getElementById('health-indicator') || this.createHealthIndicator();
+        
+        switch (status) {
+            case 'healthy':
+                healthIndicator.textContent = '🟢';
+                healthIndicator.title = 'API is healthy';
+                break;
+            case 'degraded':
+                healthIndicator.textContent = '🟡';
+                healthIndicator.title = 'API is experiencing issues';
+                break;
+            case 'unhealthy':
+                healthIndicator.textContent = '🔴';
+                healthIndicator.title = 'API is unavailable';
+                break;
+        }
+    }
+
+    createHealthIndicator() {
+        const indicator = document.createElement('span');
+        indicator.id = 'health-indicator';
+        indicator.style.cssText = 'margin-left: 10px; font-size: 12px; cursor: help;';
+        
+        const header = document.querySelector('header h1');
+        if (header) {
+            header.appendChild(indicator);
+        }
+        
+        return indicator;
     }
 
     bindEvents() {
@@ -55,29 +169,93 @@ class TEDashboard {
 
     async loadData() {
         try {
-            // Try to load cached data first
-            const cachedData = localStorage.getItem('te-dashboard-data');
-            if (cachedData) {
-                const parsed = JSON.parse(cachedData);
-                this.data = parsed;
-                this.updateLastUpdated();
-                this.processData();
+            // Show loading state
+            this.showLoading(true);
+            this.showStatus('Loading data...', 'info');
+            
+            // Try to load cached data first for immediate display
+            const cachedData = this.loadCachedData();
+            if (cachedData && this.isDataValid(cachedData)) {
+                this.processData(cachedData);
+                this.showStatus('Showing cached data. Checking for updates...', 'info');
             }
             
             // Always try to fetch fresh data
-            await this.fetchData();
+            await this.fetchDataWithRetry();
+            
         } catch (error) {
             console.error('Error loading data:', error);
-            this.showError('Failed to load data');
+            
+            // Try to use cached data as fallback
+            const cachedData = this.loadCachedData();
+            if (cachedData && this.isDataValid(cachedData)) {
+                this.processData(cachedData);
+                this.showStatus('Using cached data due to connection issues', 'warning');
+            } else {
+                this.showError('Unable to load data. Please check your connection and try again.');
+            }
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async fetchDataWithRetry() {
+        let lastError = null;
+        
+        for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+            const startTime = Date.now();
+            
+            try {
+                const data = await this.fetchData();
+                const responseTime = Date.now() - startTime;
+                
+                if (data && this.isDataValid(data)) {
+                    // Success! Cache the data and process it
+                    this.cacheData(data);
+                    this.processData(data);
+                    this.lastSuccessfulFetch = new Date();
+                    this.retryCount = 0;
+                    this.showStatus('Data updated successfully', 'success');
+                    
+                    // Update connection indicator based on response time
+                    if (responseTime < 2000) {
+                        this.updateConnectionIndicator('online');
+                    } else {
+                        this.updateConnectionIndicator('slow');
+                    }
+                    
+                    return data;
+                } else {
+                    throw new Error('Invalid data received from API');
+                }
+                
+            } catch (error) {
+                lastError = error;
+                console.warn(`Fetch attempt ${attempt} failed:`, error.message);
+                
+                // Update connection indicator on error
+                this.updateConnectionIndicator('offline');
+                
+                if (attempt < this.maxRetries) {
+                    const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+                    this.showStatus(`Retrying in ${delay/1000} seconds... (${attempt}/${this.maxRetries})`, 'warning');
+                    await this.sleep(delay);
+                } else {
+                    this.retryCount++;
+                    throw lastError;
+                }
+            }
         }
     }
 
     async fetchData() {
-        this.showLoading(true);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+        
         try {
-            // Add cache-busting parameter to ensure fresh data
             const cacheBuster = new Date().getTime();
             const response = await fetch(`/api/ramp-data?t=${cacheBuster}`, {
+                signal: controller.signal,
                 cache: 'no-cache',
                 headers: {
                     'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -85,77 +263,182 @@ class TEDashboard {
                     'Expires': '0'
                 }
             });
+            
+            clearTimeout(timeoutId);
+            
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
+            
             const data = await response.json();
             
-            this.data = {
+            // Validate the response structure
+            if (!data || typeof data !== 'object') {
+                throw new Error('Invalid response format');
+            }
+            
+            return {
                 expenses: data.expenses || [],
                 transactions: data.transactions || [],
                 spendCategories: data.spendCategories || [],
                 spendPrograms: data.spendPrograms || [],
                 receipts: data.receipts || [],
                 memos: data.memos || [],
-                lastUpdated: new Date().toISOString()
+                lastUpdated: new Date().toISOString(),
+                environment: data.environment || 'unknown',
+                totalTransactions: data.totalTransactions || 0,
+                totalReimbursements: data.totalReimbursements || 0
             };
             
-            // Cache the data
-            localStorage.setItem('te-dashboard-data', JSON.stringify(this.data));
-            
-            this.updateLastUpdated();
-            this.processData();
         } catch (error) {
-            console.error('Error fetching data:', error);
-            this.showError('Failed to fetch fresh data. Showing cached data if available.');
-        } finally {
-            this.showLoading(false);
+            clearTimeout(timeoutId);
+            
+            if (error.name === 'AbortError') {
+                throw new Error('Request timed out after 15 seconds');
+            }
+            
+            throw error;
         }
+    }
+
+    // Data persistence and validation utilities
+    cacheData(data) {
+        try {
+            const cacheData = {
+                ...data,
+                cachedAt: new Date().toISOString(),
+                version: '1.0'
+            };
+            localStorage.setItem('te-dashboard-data', JSON.stringify(cacheData));
+            localStorage.setItem('te-dashboard-last-update', new Date().toISOString());
+        } catch (error) {
+            console.warn('Failed to cache data:', error);
+        }
+    }
+
+    loadCachedData() {
+        try {
+            const cached = localStorage.getItem('te-dashboard-data');
+            if (cached) {
+                return JSON.parse(cached);
+            }
+        } catch (error) {
+            console.warn('Failed to load cached data:', error);
+            // Clear corrupted cache
+            localStorage.removeItem('te-dashboard-data');
+        }
+        return null;
+    }
+
+    isDataValid(data) {
+        if (!data || typeof data !== 'object') return false;
+        
+        // Check if data is too old (more than 24 hours)
+        if (data.cachedAt) {
+            const cacheAge = Date.now() - new Date(data.cachedAt).getTime();
+            if (cacheAge > 24 * 60 * 60 * 1000) {
+                console.warn('Cached data is too old');
+                return false;
+            }
+        }
+        
+        // Validate required fields
+        return Array.isArray(data.expenses) && Array.isArray(data.transactions);
+    }
+
+    showStatus(message, type = 'info') {
+        const statusElement = document.getElementById('status-message') || this.createStatusElement();
+        
+        statusElement.textContent = message;
+        statusElement.className = `status-message ${type}`;
+        statusElement.style.display = 'block';
+        
+        // Auto-hide success messages
+        if (type === 'success') {
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 3000);
+        }
+    }
+
+    createStatusElement() {
+        const statusElement = document.createElement('div');
+        statusElement.id = 'status-message';
+        statusElement.className = 'status-message';
+        statusElement.style.cssText = `
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 4px;
+            z-index: 1000;
+            max-width: 400px;
+            display: none;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        `;
+        
+        // Add CSS for different status types
+        const style = document.createElement('style');
+        style.textContent = `
+            .status-message.info { background: #3b82f6; color: white; }
+            .status-message.success { background: #10b981; color: white; }
+            .status-message.warning { background: #f59e0b; color: white; }
+            .status-message.error { background: #ef4444; color: white; }
+        `;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(statusElement);
+        return statusElement;
+    }
+
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     async refreshData() {
         try {
-            // Show loading state
-            this.showLoading(true);
-            
-            // Clear any cached data
-            this.data = {
-                expenses: [],
-                transactions: [],
-                lastUpdated: null
-            };
-            this.filteredData = [];
-            
-            // Update UI to show refreshing
-            document.getElementById('last-updated').textContent = 'Refreshing...';
-            
-            // Fetch fresh data
-            await this.fetchData();
-            
-            // Show success message briefly
+            // Disable refresh button during refresh
             const refreshBtn = document.getElementById('refresh-btn');
             const originalText = refreshBtn.textContent;
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = 'Refreshing...';
+            
+            // Clear current data to force fresh fetch
+            this.data = { expenses: [], transactions: [], lastUpdated: null };
+            this.filteredData = [];
+            
+            // Show refreshing status
+            this.showStatus('Refreshing data...', 'info');
+            
+            // Fetch fresh data
+            await this.fetchDataWithRetry();
+            
+            // Success feedback
             refreshBtn.textContent = 'Refreshed!';
             refreshBtn.style.backgroundColor = '#10b981';
             
             setTimeout(() => {
                 refreshBtn.textContent = originalText;
                 refreshBtn.style.backgroundColor = '';
+                refreshBtn.disabled = false;
             }, 2000);
             
         } catch (error) {
             console.error('Error refreshing data:', error);
             
-            // Show error state
+            // Error feedback
             const refreshBtn = document.getElementById('refresh-btn');
-            const originalText = refreshBtn.textContent;
             refreshBtn.textContent = 'Error - Try Again';
             refreshBtn.style.backgroundColor = '#ef4444';
             
             setTimeout(() => {
-                refreshBtn.textContent = originalText;
+                refreshBtn.textContent = 'Refresh Data';
                 refreshBtn.style.backgroundColor = '';
+                refreshBtn.disabled = false;
             }, 3000);
+            
+            this.showStatus('Failed to refresh data. Please try again.', 'error');
         }
     }
 
@@ -165,7 +448,18 @@ class TEDashboard {
         return category.replace(/^Operating expense\s*[>\-:]*\s*/i, '').trim() || 'Uncategorized';
     }
 
-    processData() {
+    processData(data = null) {
+        if (!data) {
+            data = this.data;
+        }
+        
+        // Store the raw data
+        this.data = {
+            expenses: data.expenses || [],
+            transactions: data.transactions || [],
+            lastUpdated: data.lastUpdated || new Date().toISOString()
+        };
+        
         // Combine expenses and transactions into a unified format
         const allTransactions = [];
         
@@ -750,14 +1044,6 @@ class TEDashboard {
         }).format(amount);
     }
 
-    updateLastUpdated() {
-        const lastUpdatedElement = document.getElementById('last-updated');
-        if (this.data.lastUpdated) {
-            const date = new Date(this.data.lastUpdated);
-            lastUpdatedElement.textContent = `Last updated: ${date.toLocaleString()}`;
-        }
-    }
-
     showLoading(show) {
         const loadingElement = document.getElementById('loading');
         const refreshBtn = document.getElementById('refresh-btn');
@@ -773,15 +1059,68 @@ class TEDashboard {
         }
     }
 
-    showError(message) {
-        const errorElement = document.getElementById('error');
-        errorElement.querySelector('p').textContent = message;
-        errorElement.classList.remove('hidden');
+    updateLastUpdated() {
+        const lastUpdatedElement = document.getElementById('last-updated');
+        if (lastUpdatedElement && this.data.lastUpdated) {
+            const date = new Date(this.data.lastUpdated);
+            lastUpdatedElement.textContent = `Last updated: ${date.toLocaleString()}`;
+            
+            // Update data freshness indicator
+            this.updateDataFreshnessIndicator(date);
+        }
+    }
+
+    updateDataFreshnessIndicator(lastUpdate) {
+        const indicator = document.getElementById('data-freshness');
+        if (!indicator) return;
         
-        // Hide error after 5 seconds
-        setTimeout(() => {
-            errorElement.classList.add('hidden');
-        }, 5000);
+        const now = new Date();
+        const ageMinutes = (now - lastUpdate) / (1000 * 60);
+        
+        if (ageMinutes < 5) {
+            indicator.textContent = '🟢'; // Fresh (green)
+            indicator.title = 'Data is fresh (updated within 5 minutes)';
+        } else if (ageMinutes < 30) {
+            indicator.textContent = '🟡'; // Moderate (yellow)
+            indicator.title = `Data is ${Math.round(ageMinutes)} minutes old`;
+        } else {
+            indicator.textContent = '🔴'; // Stale (red)
+            indicator.title = `Data is ${Math.round(ageMinutes)} minutes old - consider refreshing`;
+        }
+    }
+
+    updateConnectionIndicator(status) {
+        const indicator = document.getElementById('connection-status');
+        if (!indicator) return;
+        
+        switch (status) {
+            case 'online':
+                indicator.textContent = '🟢';
+                indicator.title = 'Connected - API is responsive';
+                break;
+            case 'slow':
+                indicator.textContent = '🟡';
+                indicator.title = 'Connected - API is slow';
+                break;
+            case 'offline':
+                indicator.textContent = '🔴';
+                indicator.title = 'Offline - Using cached data';
+                break;
+            default:
+                indicator.textContent = '🌐';
+                indicator.title = 'Connection status unknown';
+        }
+    }
+
+    showError(message) {
+        this.showStatus(message, 'error');
+        
+        // Also update the main error display
+        const errorElement = document.getElementById('error');
+        if (errorElement) {
+            errorElement.querySelector('p').textContent = message;
+            errorElement.classList.remove('hidden');
+        }
     }
 
     setDateRange(range) {

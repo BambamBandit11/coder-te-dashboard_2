@@ -11,6 +11,10 @@
     <header>
         <h1>Travel & Entertainment Dashboard</h1>
         <div class="header-controls">
+            <div class="system-status">
+                <span id="data-freshness" class="status-indicator" title="Data freshness">🔄</span>
+                <span id="connection-status" class="status-indicator" title="Connection status">🌐</span>
+            </div>
             <span id="last-updated">Last updated: Never</span>
             <button id="refresh-btn" class="btn-primary">Refresh Data</button>
         </div>
@@ -178,12 +182,15 @@
         </div>
     </div>
 
-    <div id="loading" class="loading hidden">
-        <div class="spinner"></div>
-        <p>Loading data...</p>
+    <div id="loading" class="loading-overlay hidden">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p>Loading T&E data...</p>
+            <small>This may take a few moments</small>
+        </div>
     </div>
 
-    <div id="error" class="error hidden">
+    <div id="error" class="error-banner hidden">
         <p>Error loading data. Please try again.</p>
     </div>
 

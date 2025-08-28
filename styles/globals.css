@@ -1,0 +1,72 @@
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #f9fafb;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Status badge styles */
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-cleared {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-approved {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-declined,
+.status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-processing {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.status-unknown {
+  background: #f3f4f6;
+  color: #374151;
+}

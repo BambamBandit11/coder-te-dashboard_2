@@ -1,7 +1,26 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { useSession, signIn, signOut } from 'next-auth/react';
 
 export default function Dashboard() {
+  const { data: session, status } = useSession();
+  
+  // Show loading while checking authentication
+  if (status === 'loading') {
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+  
+  // Redirect to sign in if not authenticated
+  if (!session) {
+    signIn();
+    return null;
+  }
+
   const [data, setData] = useState({
     expenses: [],
     transactions: [],
@@ -73,7 +92,7 @@ export default function Dashboard() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('/api/data');
+      const response = await fetch('/api/ramp-data');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -491,6 +510,12 @@ export default function Dashboard() {
         <header className="header">
           <h1>Travel & Entertainment Dashboard</h1>
           <div className="header-controls">
+            <div className="user-info">
+              <span className="user-email">{session.user.email}</span>
+              <button className="sign-out-btn" onClick={() => signOut()}>
+                Sign Out
+              </button>
+            </div>
             <span>Last updated: {data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : 'Never'}</span>
             <button className="btn-primary" onClick={fetchData} disabled={loading}>
               {loading ? 'Loading...' : 'Refresh Data'}

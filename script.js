@@ -75,7 +75,16 @@ class TEDashboard {
     async fetchData() {
         this.showLoading(true);
         try {
-            const response = await fetch('/api/data');
+            // Add cache-busting parameter to ensure fresh data
+            const cacheBuster = new Date().getTime();
+            const response = await fetch(`/api/ramp-data?t=${cacheBuster}`, {
+                cache: 'no-cache',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -105,7 +114,49 @@ class TEDashboard {
     }
 
     async refreshData() {
-        await this.fetchData();
+        try {
+            // Show loading state
+            this.showLoading(true);
+            
+            // Clear any cached data
+            this.data = {
+                expenses: [],
+                transactions: [],
+                lastUpdated: null
+            };
+            this.filteredData = [];
+            
+            // Update UI to show refreshing
+            document.getElementById('last-updated').textContent = 'Refreshing...';
+            
+            // Fetch fresh data
+            await this.fetchData();
+            
+            // Show success message briefly
+            const refreshBtn = document.getElementById('refresh-btn');
+            const originalText = refreshBtn.textContent;
+            refreshBtn.textContent = 'Refreshed!';
+            refreshBtn.style.backgroundColor = '#10b981';
+            
+            setTimeout(() => {
+                refreshBtn.textContent = originalText;
+                refreshBtn.style.backgroundColor = '';
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Error refreshing data:', error);
+            
+            // Show error state
+            const refreshBtn = document.getElementById('refresh-btn');
+            const originalText = refreshBtn.textContent;
+            refreshBtn.textContent = 'Error - Try Again';
+            refreshBtn.style.backgroundColor = '#ef4444';
+            
+            setTimeout(() => {
+                refreshBtn.textContent = originalText;
+                refreshBtn.style.backgroundColor = '';
+            }, 3000);
+        }
     }
 
     trimCategory(category) {

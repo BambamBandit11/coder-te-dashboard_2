@@ -64,7 +64,7 @@ class TEDashboard {
     async fetchData() {
         this.showLoading(true);
         try {
-            const response = await fetch('/api/ramp-data');
+            const response = await fetch('/api/data');
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }

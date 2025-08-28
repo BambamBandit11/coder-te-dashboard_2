@@ -254,7 +254,7 @@ class TEDashboard {
         
         try {
             const cacheBuster = new Date().getTime();
-            const response = await fetch(`/api/ramp-data?t=${cacheBuster}`, {
+            const response = await fetch(`/api/data?t=${cacheBuster}`, {
                 signal: controller.signal,
                 cache: 'no-cache',
                 headers: {
@@ -277,6 +277,19 @@ class TEDashboard {
                 throw new Error('Invalid response format');
             }
             
+            // Handle API warnings
+            if (data.warnings && data.warnings.length > 0) {
+                console.warn('API Warnings:', data.warnings);
+                data.warnings.forEach(warning => {
+                    this.showStatus(warning, 'warning');
+                });
+            }
+            
+            // Handle error status but still use the data
+            if (data.status === 'error') {
+                this.showStatus(data.message || 'API returned error status', 'warning');
+            }
+            
             return {
                 expenses: data.expenses || [],
                 transactions: data.transactions || [],
@@ -284,7 +297,7 @@ class TEDashboard {
                 spendPrograms: data.spendPrograms || [],
                 receipts: data.receipts || [],
                 memos: data.memos || [],
-                lastUpdated: new Date().toISOString(),
+                lastUpdated: data.lastUpdated || new Date().toISOString(),
                 environment: data.environment || 'unknown',
                 totalTransactions: data.totalTransactions || 0,
                 totalReimbursements: data.totalReimbursements || 0

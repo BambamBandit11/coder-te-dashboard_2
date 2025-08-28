@@ -1,16 +1,35 @@
 {
   "functions": {
-    "api/ramp-data.js": {
-      "maxDuration": 30
-    },
     "api/data.js": {
       "maxDuration": 30
+    },
+    "api/health.js": {
+      "maxDuration": 5
     }
   },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ],
   "crons": [
     {
-      "path": "/api/refresh-cache",
-      "schedule": "0 7 * * *"
+      "path": "/api/health",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

@@ -67,6 +67,13 @@
             </div>
             
             <div class="filter-group">
+                <label for="status-filter">Status:</label>
+                <select id="status-filter">
+                    <option value="all">All Statuses</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
                 <label for="memo-filter">Memo Search:</label>
                 <input type="text" id="memo-filter" class="text-input" placeholder="Search memos...">
             </div>
@@ -158,6 +165,7 @@
                             <th class="sortable" data-sort="merchant">Merchant <span class="sort-arrow"></span></th>
                             <th class="sortable" data-sort="amount">Amount <span class="sort-arrow"></span></th>
                             <th class="sortable" data-sort="location">Location <span class="sort-arrow"></span></th>
+                            <th class="sortable" data-sort="status">Status <span class="sort-arrow"></span></th>
                             <th class="sortable" data-sort="type">Type <span class="sort-arrow"></span></th>
                         </tr>
                     </thead>

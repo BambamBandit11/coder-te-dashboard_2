@@ -144,6 +144,7 @@ class TEDashboard {
         document.getElementById('spend-category-filter').addEventListener('change', () => this.applyFilters());
         document.getElementById('spend-program-filter').addEventListener('change', () => this.applyFilters());
         document.getElementById('type-filter').addEventListener('change', () => this.applyFilters());
+        document.getElementById('status-filter').addEventListener('change', () => this.applyFilters());
         
         // CSV export button
         document.getElementById('export-csv').addEventListener('click', () => this.exportToCSV());
@@ -501,6 +502,7 @@ class TEDashboard {
                 merchant: expense.merchant || 'Unknown',
                 location: location,
                 type: 'expense',
+                status: expense.state || 'Unknown',
                 // Enhanced fields
                 accountingCategory: this.trimCategory(glAccount?.name),
                 merchantDescriptor: expense.merchant || 'Unknown',
@@ -535,6 +537,7 @@ class TEDashboard {
                 merchant: transaction.merchant_name || 'Unknown',
                 location: locationString,
                 type: 'transaction',
+                status: transaction.state || 'Unknown',
                 // Enhanced fields
                 accountingCategory: this.trimCategory(glAccount?.category_name),
                 merchantDescriptor: transaction.merchant_descriptor || transaction.merchant_name || 'Unknown',
@@ -559,11 +562,13 @@ class TEDashboard {
         const employees = [...new Set(this.filteredData.map(t => t.employee))].sort();
         const merchants = [...new Set(this.filteredData.map(t => t.merchant))].sort();
         const categories = [...new Set(this.filteredData.map(t => t.accountingCategory))].sort();
+        const statuses = [...new Set(this.filteredData.map(t => t.status))].sort();
         
         this.populateSelect('department-filter', departments);
         this.populateSelect('employee-filter', employees);
         this.populateSelect('merchant-filter', merchants);
         this.populateSelect('category-filter', categories);
+        this.populateSelect('status-filter', statuses);
         
         // Populate spend categories from API data
         const spendCategories = this.data.spendCategories.map(cat => cat.name || cat.display_name || 'Unknown').sort();
@@ -626,22 +631,20 @@ class TEDashboard {
         const spendCategoryFilter = document.getElementById('spend-category-filter').value;
         const spendProgramFilter = document.getElementById('spend-program-filter').value;
         const typeFilter = document.getElementById('type-filter').value;
+        const statusFilter = document.getElementById('status-filter').value;
         
         let filtered = [...this.filteredData];
         
+        // Apply all filters (same logic as applyFilters)
         if (departmentFilter !== 'all') {
             filtered = filtered.filter(t => t.department === departmentFilter);
         }
-        
         if (employeeFilter !== 'all') {
             filtered = filtered.filter(t => t.employee === employeeFilter);
         }
-        
         if (typeFilter !== 'all') {
             filtered = filtered.filter(t => t.type === typeFilter);
         }
-        
-        // Apply month filter (takes precedence over date range if both are set)
         if (monthFilter !== 'all') {
             const [year, month] = monthFilter.split('-');
             filtered = filtered.filter(t => {
@@ -681,6 +684,10 @@ class TEDashboard {
         
         if (spendProgramFilter !== 'all') {
             filtered = filtered.filter(t => t.spendProgram === spendProgramFilter);
+        }
+        
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(t => t.status === statusFilter);
         }
         
         this.updateSummary(filtered);
@@ -869,6 +876,7 @@ class TEDashboard {
                 <td>${transaction.merchant}</td>
                 <td class="amount-cell">${this.formatCurrency(transaction.amount)}</td>
                 <td>${transaction.location}</td>
+                <td><span class="status-badge status-${transaction.status.toLowerCase()}">${transaction.status}</span></td>
                 <td><span class="type-badge type-${transaction.type}">${transaction.type === 'expense' ? 'Reimbursement' : 'Transaction'}</span></td>
             `;
             
@@ -880,7 +888,7 @@ class TEDashboard {
         
         if (recentTransactions.length === 0) {
             const row = document.createElement('tr');
-            row.innerHTML = '<td colspan="7" style="text-align: center; color: #6b7280; font-style: italic;">No transactions found</td>';
+            row.innerHTML = '<td colspan="8" style="text-align: center; color: #6b7280; font-style: italic;">No transactions found</td>';
             tbody.appendChild(row);
         }
     }
@@ -948,6 +956,7 @@ class TEDashboard {
         const spendCategoryFilter = document.getElementById('spend-category-filter').value;
         const spendProgramFilter = document.getElementById('spend-program-filter').value;
         const typeFilter = document.getElementById('type-filter').value;
+        const statusFilter = document.getElementById('status-filter').value;
         
         let filtered = [...this.filteredData];
         
@@ -991,6 +1000,9 @@ class TEDashboard {
         if (spendProgramFilter !== 'all') {
             filtered = filtered.filter(t => t.spendProgram === spendProgramFilter);
         }
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(t => t.status === statusFilter);
+        }
         
         // Sort the data
         const sortedData = [...filtered].sort((a, b) => {
@@ -1016,7 +1028,7 @@ class TEDashboard {
         });
         
         // Create CSV content
-        const headers = ['Date', 'Employee', 'Department', 'Merchant', 'Amount', 'Location', 'Type', 'Category', 'Memo'];
+        const headers = ['Date', 'Employee', 'Department', 'Merchant', 'Amount', 'Location', 'Status', 'Type', 'Category', 'Memo'];
         const csvContent = [headers.join(',')];
         
         sortedData.forEach(transaction => {
@@ -1027,6 +1039,7 @@ class TEDashboard {
                 `"${transaction.merchant}"`,
                 transaction.amount,
                 `"${transaction.location}"`,
+                `"${transaction.status}"`,
                 transaction.type === 'expense' ? 'Reimbursement' : 'Transaction',
                 `"${transaction.accountingCategory}"`,
                 `"${transaction.memo.replace(/"/g, '""')}"`

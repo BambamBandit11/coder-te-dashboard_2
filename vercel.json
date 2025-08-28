@@ -3,7 +3,7 @@
     "api/ramp-data.js": {
       "maxDuration": 30
     },
-    "pages/api/data.js": {
+    "api/data.js": {
       "maxDuration": 30
     }
   },

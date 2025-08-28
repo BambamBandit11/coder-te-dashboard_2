@@ -6,6 +6,8 @@ class TEDashboard {
             lastUpdated: null
         };
         this.filteredData = [];
+        this.sortColumn = 'date';
+        this.sortDirection = 'desc';
         this.init();
     }
 
@@ -27,6 +29,15 @@ class TEDashboard {
         document.getElementById('memo-filter').addEventListener('input', () => this.applyFilters());
         document.getElementById('spend-category-filter').addEventListener('change', () => this.applyFilters());
         document.getElementById('spend-program-filter').addEventListener('change', () => this.applyFilters());
+        document.getElementById('type-filter').addEventListener('change', () => this.applyFilters());
+        
+        // CSV export button
+        document.getElementById('export-csv').addEventListener('click', () => this.exportToCSV());
+        
+        // Sortable column headers
+        document.querySelectorAll('.sortable').forEach(header => {
+            header.addEventListener('click', () => this.sortTable(header.dataset.sort));
+        });
         
         // Preset date range buttons
         document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -97,6 +108,12 @@ class TEDashboard {
         await this.fetchData();
     }
 
+    trimCategory(category) {
+        if (!category) return 'Uncategorized';
+        // Remove "Operating expense" prefix and any leading separators
+        return category.replace(/^Operating expense\s*[>\-:]*\s*/i, '').trim() || 'Uncategorized';
+    }
+
     processData() {
         // Combine expenses and transactions into a unified format
         const allTransactions = [];
@@ -127,12 +144,12 @@ class TEDashboard {
                 location: location,
                 type: 'expense',
                 // Enhanced fields
-                accountingCategory: glAccount?.name || 'Uncategorized',
+                accountingCategory: this.trimCategory(glAccount?.name),
                 merchantDescriptor: expense.merchant || 'Unknown',
                 state: expense.state || 'Unknown',
                 cardHolderLocation: 'N/A', // Reimbursements don't have card holder location
                 memo: expense.memo || 'No memo',
-                spendCategory: 'Reimbursement', // Reimbursements don't have spend categories
+                spendCategory: this.trimCategory(expense.sk_category_name),
                 spendProgram: this.getSpendProgramName(expense.spend_program_id) || 'No Program'
             });
         });
@@ -161,12 +178,12 @@ class TEDashboard {
                 location: locationString,
                 type: 'transaction',
                 // Enhanced fields
-                accountingCategory: glAccount?.category_name || 'Uncategorized',
+                accountingCategory: this.trimCategory(glAccount?.category_name),
                 merchantDescriptor: transaction.merchant_descriptor || transaction.merchant_name || 'Unknown',
                 state: transaction.state || 'Unknown',
                 cardHolderLocation: transaction.card_holder?.location_name || 'Unknown',
                 memo: transaction.memo || 'No memo',
-                spendCategory: transaction.sk_category_name || 'Uncategorized',
+                spendCategory: this.trimCategory(transaction.sk_category_name),
                 spendProgram: this.getSpendProgramName(transaction.spend_program_id) || 'No Program'
             });
         });
@@ -250,6 +267,7 @@ class TEDashboard {
         const memoFilter = document.getElementById('memo-filter').value.toLowerCase().trim();
         const spendCategoryFilter = document.getElementById('spend-category-filter').value;
         const spendProgramFilter = document.getElementById('spend-program-filter').value;
+        const typeFilter = document.getElementById('type-filter').value;
         
         let filtered = [...this.filteredData];
         
@@ -259,6 +277,10 @@ class TEDashboard {
         
         if (employeeFilter !== 'all') {
             filtered = filtered.filter(t => t.employee === employeeFilter);
+        }
+        
+        if (typeFilter !== 'all') {
+            filtered = filtered.filter(t => t.type === typeFilter);
         }
         
         // Apply month filter (takes precedence over date range if both are set)
@@ -427,12 +449,58 @@ class TEDashboard {
         chartContainer.appendChild(summaryDiv);
     }
 
+    sortTable(column) {
+        // Toggle sort direction if clicking the same column
+        if (this.sortColumn === column) {
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.sortColumn = column;
+            this.sortDirection = 'asc';
+        }
+        
+        // Update visual indicators
+        document.querySelectorAll('.sortable').forEach(header => {
+            header.classList.remove('sort-asc', 'sort-desc');
+        });
+        
+        const currentHeader = document.querySelector(`[data-sort="${column}"]`);
+        currentHeader.classList.add(`sort-${this.sortDirection}`);
+        
+        // Apply current filters to get the data to sort
+        this.applyFilters();
+    }
+
     updateTransactionsTable(data) {
         const tbody = document.querySelector('#transactions tbody');
         tbody.innerHTML = '';
         
+        // Sort the data based on current sort settings
+        const sortedData = [...data].sort((a, b) => {
+            let aVal = a[this.sortColumn];
+            let bVal = b[this.sortColumn];
+            
+            // Handle different data types
+            if (this.sortColumn === 'date') {
+                aVal = a.date.getTime();
+                bVal = b.date.getTime();
+            } else if (this.sortColumn === 'amount') {
+                aVal = parseFloat(a.amount);
+                bVal = parseFloat(b.amount);
+            } else {
+                // String comparison
+                aVal = (aVal || '').toString().toLowerCase();
+                bVal = (bVal || '').toString().toLowerCase();
+            }
+            
+            if (this.sortDirection === 'asc') {
+                return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+            } else {
+                return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+            }
+        });
+        
         // Show latest 50 transactions
-        const recentTransactions = data.slice(0, 50);
+        const recentTransactions = sortedData.slice(0, 50);
         
         recentTransactions.forEach((transaction, index) => {
             const row = document.createElement('tr');
@@ -508,7 +576,118 @@ class TEDashboard {
         
         modal.classList.remove('hidden');
     }
-    
+
+    exportToCSV() {
+        // Get current filtered data
+        const departmentFilter = document.getElementById('department-filter').value;
+        const employeeFilter = document.getElementById('employee-filter').value;
+        const monthFilter = document.getElementById('month-filter').value;
+        const merchantFilter = document.getElementById('merchant-filter').value;
+        const categoryFilter = document.getElementById('category-filter').value;
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo = document.getElementById('date-to').value;
+        const memoFilter = document.getElementById('memo-filter').value.toLowerCase().trim();
+        const spendCategoryFilter = document.getElementById('spend-category-filter').value;
+        const spendProgramFilter = document.getElementById('spend-program-filter').value;
+        const typeFilter = document.getElementById('type-filter').value;
+        
+        let filtered = [...this.filteredData];
+        
+        // Apply all filters (same logic as applyFilters)
+        if (departmentFilter !== 'all') {
+            filtered = filtered.filter(t => t.department === departmentFilter);
+        }
+        if (employeeFilter !== 'all') {
+            filtered = filtered.filter(t => t.employee === employeeFilter);
+        }
+        if (typeFilter !== 'all') {
+            filtered = filtered.filter(t => t.type === typeFilter);
+        }
+        if (monthFilter !== 'all') {
+            const [year, month] = monthFilter.split('-');
+            filtered = filtered.filter(t => {
+                const transactionYear = t.date.getFullYear();
+                const transactionMonth = t.date.getMonth() + 1;
+                return transactionYear === parseInt(year) && transactionMonth === parseInt(month);
+            });
+        } else if (dateFrom || dateTo) {
+            filtered = filtered.filter(t => {
+                const transactionDate = t.date;
+                if (dateFrom && transactionDate < new Date(dateFrom)) return false;
+                if (dateTo && transactionDate > new Date(dateTo + 'T23:59:59')) return false;
+                return true;
+            });
+        }
+        if (merchantFilter !== 'all') {
+            filtered = filtered.filter(t => t.merchant === merchantFilter);
+        }
+        if (categoryFilter !== 'all') {
+            filtered = filtered.filter(t => t.accountingCategory === categoryFilter);
+        }
+        if (memoFilter) {
+            filtered = filtered.filter(t => t.memo.toLowerCase().includes(memoFilter));
+        }
+        if (spendCategoryFilter !== 'all') {
+            filtered = filtered.filter(t => t.spendCategory === spendCategoryFilter);
+        }
+        if (spendProgramFilter !== 'all') {
+            filtered = filtered.filter(t => t.spendProgram === spendProgramFilter);
+        }
+        
+        // Sort the data
+        const sortedData = [...filtered].sort((a, b) => {
+            let aVal = a[this.sortColumn];
+            let bVal = b[this.sortColumn];
+            
+            if (this.sortColumn === 'date') {
+                aVal = a.date.getTime();
+                bVal = b.date.getTime();
+            } else if (this.sortColumn === 'amount') {
+                aVal = parseFloat(a.amount);
+                bVal = parseFloat(b.amount);
+            } else {
+                aVal = (aVal || '').toString().toLowerCase();
+                bVal = (bVal || '').toString().toLowerCase();
+            }
+            
+            if (this.sortDirection === 'asc') {
+                return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+            } else {
+                return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+            }
+        });
+        
+        // Create CSV content
+        const headers = ['Date', 'Employee', 'Department', 'Merchant', 'Amount', 'Location', 'Type', 'Category', 'Memo'];
+        const csvContent = [headers.join(',')];
+        
+        sortedData.forEach(transaction => {
+            const row = [
+                transaction.date.toLocaleDateString(),
+                `"${transaction.employee}"`,
+                `"${transaction.department}"`,
+                `"${transaction.merchant}"`,
+                transaction.amount,
+                `"${transaction.location}"`,
+                transaction.type === 'expense' ? 'Reimbursement' : 'Transaction',
+                `"${transaction.accountingCategory}"`,
+                `"${transaction.memo.replace(/"/g, '""')}"`
+            ];
+            csvContent.push(row.join(','));
+        });
+        
+        // Download CSV file
+        const blob = new Blob([csvContent.join('\n')], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `te-dashboard-export-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }
+
     closeModal() {
         document.getElementById('transaction-modal').classList.add('hidden');
     }

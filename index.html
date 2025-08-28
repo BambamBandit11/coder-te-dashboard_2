@@ -54,6 +54,15 @@
             </div>
             
             <div class="filter-group">
+                <label for="type-filter">Type:</label>
+                <select id="type-filter">
+                    <option value="all">All Types</option>
+                    <option value="transaction">Transaction</option>
+                    <option value="expense">Reimbursement</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
                 <label for="memo-filter">Memo Search:</label>
                 <input type="text" id="memo-filter" class="text-input" placeholder="Search memos...">
             </div>
@@ -131,18 +140,21 @@
         </div>
 
         <div class="transactions-table">
-            <h2>Recent Transactions</h2>
+            <div class="table-header">
+                <h2>Recent Transactions</h2>
+                <button id="export-csv" class="btn-secondary">Export to CSV</button>
+            </div>
             <div class="table-container">
                 <table id="transactions">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Employee</th>
-                            <th>Department</th>
-                            <th>Merchant</th>
-                            <th>Amount</th>
-                            <th>Location</th>
-                            <th>Type</th>
+                            <th class="sortable" data-sort="date">Date <span class="sort-arrow"></span></th>
+                            <th class="sortable" data-sort="employee">Employee <span class="sort-arrow"></span></th>
+                            <th class="sortable" data-sort="department">Department <span class="sort-arrow"></span></th>
+                            <th class="sortable" data-sort="merchant">Merchant <span class="sort-arrow"></span></th>
+                            <th class="sortable" data-sort="amount">Amount <span class="sort-arrow"></span></th>
+                            <th class="sortable" data-sort="location">Location <span class="sort-arrow"></span></th>
+                            <th class="sortable" data-sort="type">Type <span class="sort-arrow"></span></th>
                         </tr>
                     </thead>
                     <tbody>

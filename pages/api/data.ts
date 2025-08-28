@@ -176,17 +176,17 @@ export default async function handler(
 }
 
 // Utility function to add timeout to any promise
-function withTimeout(promise, timeoutMs, timeoutMessage) {
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
     return Promise.race([
         promise,
-        new Promise((_, reject) => 
+        new Promise<never>((_, reject) => 
             setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)
         )
     ]);
 }
 
 // Get OAuth access token with proper error handling
-async function getAccessToken(baseUrl, clientId, clientSecret) {
+async function getAccessToken(baseUrl: string, clientId: string, clientSecret: string): Promise<string> {
     const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
     
     const response = await fetch(`${baseUrl}/developer/v1/token`, {
@@ -212,7 +212,7 @@ async function getAccessToken(baseUrl, clientId, clientSecret) {
 }
 
 // Fetch transactions with error handling
-async function fetchTransactions(baseUrl, accessToken) {
+async function fetchTransactions(baseUrl: string, accessToken: string): Promise<any[]> {
     const response = await fetch(`${baseUrl}/developer/v1/transactions?limit=100`, {
         headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -230,7 +230,7 @@ async function fetchTransactions(baseUrl, accessToken) {
 }
 
 // Fetch reimbursements with error handling
-async function fetchReimbursements(baseUrl, accessToken) {
+async function fetchReimbursements(baseUrl: string, accessToken: string): Promise<any[]> {
     const response = await fetch(`${baseUrl}/developer/v1/reimbursements?limit=100`, {
         headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -248,7 +248,7 @@ async function fetchReimbursements(baseUrl, accessToken) {
 }
 
 // Mock data for testing when no credentials are available
-function getMockData() {
+function getMockData(): TransactionData {
     return {
         expenses: [
             {
